@@ -22,7 +22,7 @@ CodeMirror(document.body, {
 
 var log = require('domlog');
 log.setup({
-  top: "300px",
+  top: "400px",
   bottom: 0,
   height: "auto",
   background: "#000",
