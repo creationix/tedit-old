@@ -4,13 +4,12 @@ function add(a, b) {
   return a + c;
 }
 
+print("Adding 4 and 6");
 var total = add(4, 6);
-print("Added 4 and 6", total);
-
-var it = range(total);
-print("Created iterator");
+print("total = ", total);
 
 print("Looping through iterator...");
+var it = range(total);
 each(it, function (i) {
   print(i + 1);
 });
