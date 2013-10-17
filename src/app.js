@@ -50,18 +50,17 @@ function run(instance) {
   worker = new Worker(blobURL);
   worker.onerror = function (evt) {
     evt.preventDefault();
+    var details = {};
     var line = evt.lineno - offset;
-    var col = evt.colno;
+    var column = evt.colno;
+    if (column !== undefined) {
+      details.column = column;
+    }
     if (line < total) {
-      instance.setCursor(line - 1, col);
-      log(evt.message, {
-        line: line,
-        column: col
-      });
+      details.line = line;
+      instance.setCursor(line - 1, column);
     }
-    else {
-      log(evt.message);
-    }
+    log(evt.message, details);
   };
 
   worker.onmessage = function(evt) {
@@ -69,7 +68,7 @@ function run(instance) {
     if (Array.isArray(data)) log.apply(null, evt.data);
     if (data.error) log(data.error);
   };
-  worker.postMessage();
+  worker.postMessage("");
 
 }
 
