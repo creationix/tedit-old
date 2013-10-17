@@ -3,8 +3,15 @@
 function add(a, b) {
   return a + c;
 }
-var total = add(4, 6);
 
-each(range(total), function (i) {
+var total = add(4, 6);
+print("Added 4 and 6", total);
+
+var it = range(total);
+print("Created iterator");
+
+print("Looping through iterator...");
+each(it, function (i) {
   print(i + 1);
 });
+print("Done");
