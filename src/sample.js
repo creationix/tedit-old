@@ -3,4 +3,8 @@
 function add(a, b) {
   return a + c;
 }
-print(add(1, 2));
+var total = add(4, 6);
+
+each(range(total), function (i) {
+  print(i + 1);
+});
