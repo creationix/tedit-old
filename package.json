@@ -1,0 +1,11 @@
+{
+  "name": "tedit",
+  "version": "0.0.0",
+  "dependencies": {
+    "domlog": "~0.0.9",
+    "dombuilder": "~0.1.2"
+  },
+  "devDependencies": {
+    "tim-task": "~0.1.1"
+  }
+}
