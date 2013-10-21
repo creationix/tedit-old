@@ -56,7 +56,7 @@ module.exports = function (repo) {
     return readTree(entry.parent, onParent);
 
     function onHead(err, head) {
-      if (err) return callback(err);
+      if (head === undefined) return callback(err, entry);
       entry.hash = head.tree;
       return callback(null, entry);
     }
@@ -69,10 +69,13 @@ module.exports = function (repo) {
 
   function readTree(path, callback) {
     var entry = getEntry(path);
+    entry.mode = entry.mode || 0040000;
+
     return loadHash(entry, onHash);
 
     function onHash(err) {
       if (err) return callback(err);
+      if (!entry.hash) return callback(null, [], entry);
       return repo.loadAs("tree", entry.hash, onTree);
     }
 
@@ -95,6 +98,11 @@ module.exports = function (repo) {
 
     function onHash(err) {
       if (err) return callback(err);
+      if (!entry.hash) {
+        err = new Error("ENOENT: No such file: " + path);
+        err.code = "ENOENT";
+        return callback(err);
+      }
       return repo.loadAs(type, entry.hash, onBody);
     }
 
@@ -104,50 +112,50 @@ module.exports = function (repo) {
     }
   }
 
-  // Changes is a hash where key is name and value is action:
-  //   true (update) or false (delete)
-  function updateTree(path, toDelete, callback) {
-    var entries, tree;
-    return readTree(path, function (err, e, t) {
+  // Update an entry in a tree.  Use null value to delete.
+  function updateParent(entry, callback) {
+    readTree(entry.parent, function (err, entries, tree) {
       if (err) return callback(err);
-      entries = e;
-      tree = t;
-      if (toDelete) {
-        for (var i = entries.length - 1; i >= 0; i--) {
-          var entry = entries[i];
-          if (toDelete !== entry.name) continue;
-          entries.splice(i, 1);
-          if (exports.onChange) {
-            var childPath = path + "/" + entry.name;
-            exports.onChange(childPath, null, entry);
-          }
-          break;
+      var found = false;
+      for (var i = entries.length - 1; i >= 0; i--) {
+        var peer = entries[i];
+        if (peer.name !== entry.name) continue;
+        found = true;
+        if (entry.hash) break;
+        entries.splice(i, 1);
+        if (exports.onChange) {
+          exports.onChange(entry.parent + "/" + entry.name, null, entry);
         }
+        break;
       }
-      if (entries.length || tree.parent === null) {
-        return repo.saveAs("tree", entries, onSave);
+      if (!found) {
+        entries.push(entry);
       }
-      return updateTree(tree.parent, tree.name, callback);
+
+      if (tree.parent && entries.length === 0) {
+        tree.hash = null;
+        return updateParent(tree, callback);
+      }
+      return repo.saveAs("tree", entries, function (err, hash) {
+        if (err) return callback(err);
+        if (hash === tree.hash) return callback();
+        tree.hash = hash;
+        if (exports.onChange) exports.onChange(entry.parent, entries, tree);
+        if (tree.parent !== null) return updateParent(tree, callback);
+        callback();
+      });
     });
-
-    function onSave(err, hash) {
-      if (err) return callback(err);
-      if (hash === tree.hash) return callback();
-      tree.hash = hash;
-      if (exports.onChange) exports.onChange(path, entries, tree);
-      if (tree.parent !== null) return updateTree(tree.parent, null, callback);
-      callback();
-    }
-
   }
 
   function deleteFile(path, callback) {
     var entry = getEntry(path);
-    return updateTree(entry.parent, entry.name, callback);
+    entry.hash = null;
+    return updateParent(entry, callback);
   }
 
   function writeFile(path, body, callback) {
     var entry = getEntry(path);
+    entry.mode = entry.mode || 0100644;
     return repo.saveAs("blob", body, onHash);
 
     function onHash(err, hash) {
@@ -155,7 +163,7 @@ module.exports = function (repo) {
       if (entry.hash === hash) return callback();
       entry.hash = hash;
       if (exports.onChange) exports.onChange(path, body, entry);
-      updateTree(entry.parent, null, onUpdate);
+      updateParent(entry, onUpdate);
     }
 
     function onUpdate(err) {
