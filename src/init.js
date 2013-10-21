@@ -11,11 +11,23 @@ module.exports = function (repo, callback) {
 
   function onBlob(err, hash) {
     if (err) return callback(err);
-    var tree = [{mode: 0100644, name: "sample.txt", hash: hash}];
+    var tree = [
+      { mode: 0100644, name: "sample.txt", hash: hash }
+    ];
+    console.log("Creating tree", tree);
     return repo.saveAs("tree", tree, onTree);
   }
 
   function onTree(err, hash) {
+    if (err) return callback(err);
+    var tree = [
+      { mode: 040000, name: "app", hash: hash }
+    ];
+    console.log("Creating parent tree", tree);
+    return repo.saveAs("tree", tree, onTree2);
+  }
+
+  function onTree2(err, hash) {
     if (err) return callback(err);
     var commit = {
       tree: hash,

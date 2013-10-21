@@ -5,8 +5,8 @@
     "domlog": "~0.0.9",
     "dombuilder": "~0.1.2",
     "git-sha1": "~0.1.0",
-    "git-chrome-local-db": "~0.1.1",
-    "js-git": "~0.5.3",
+    "git-chrome-local-db": "~0.1.2",
+    "js-git": "~0.5.4",
     "bops-browser": "~0.6.0"
   },
   "devDependencies": {
