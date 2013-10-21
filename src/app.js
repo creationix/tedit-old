@@ -49,6 +49,9 @@ chrome.storage.local.clear();
 
 newRepo("test", wrap(function (repo) {
   var fs = newFileSystem(repo);
+  fs.onChange = function (path, value, entry) {
+    console.log("CHANGE", path, entry.hash);
+  }
   return repo.getHead(wrap(onHead));
 
   function onHead(head) {
@@ -58,18 +61,42 @@ newRepo("test", wrap(function (repo) {
 
   function onReady() {
     log("repo", repo);
-    log("fs", fs);
+    log("fs", {
+      "/": fs.getEntry("").hash,
+      "/app": fs.getEntry("app").hash,
+      "/app/sample.txt": fs.getEntry("app/sample.txt").hash,
+    });
     fs.readAs("text", "app/sample.txt", wrap(onFile));
-    fs.readAs("tree", "", wrap(onTree));
   }
 
   function onFile(body, entry) {
-    log(body, entry);
+    log(entry, body);
+    log("fs", {
+      "/": fs.getEntry("").hash,
+      "/app": fs.getEntry("app").hash,
+      "/app/sample.txt": fs.getEntry("app/sample.txt").hash,
+    });
+    fs.writeFile("app/sample.txt", "This is new content!\n", wrap(onSave));
   }
 
-  function onTree(entries, entry) {
-    log("entry", entry)
-    log("entries", entries);
+  function onSave(entry) {
+    log(entry);
+    log("fs", {
+      "/": fs.getEntry("").hash,
+      "/app": fs.getEntry("app").hash,
+      "/app/sample.txt": fs.getEntry("app/sample.txt").hash,
+    });
+    fs.writeFile("app/sample.txt", "This is new content!\n", wrap(onSave2));
   }
+
+  function onSave2(entry) {
+    log(entry);
+    log("fs", {
+      "/": fs.getEntry("").hash,
+      "/app": fs.getEntry("app").hash,
+      "/app/sample.txt": fs.getEntry("app/sample.txt").hash,
+    });
+  }
+
 }));
 

@@ -8,9 +8,13 @@
 module.exports = function (repo) {
   var paths = {};
 
-  return {
+  var exports = {
     readAs: readAs,
+    writeFile: writeFile,
+    getEntry: getEntry,
+    paths: paths
   };
+  return exports;
 
   // Get a path entry
   function getEntry(path) {
@@ -75,8 +79,8 @@ module.exports = function (repo) {
       if (err) return callback(err);
       tree.forEach(function (childEntry, i) {
         var child = getEntry(path + "/" + childEntry.name);
-        child.mode = childEntry.mode;
-        child.hash = childEntry.hash;
+        if (child.mode === null) child.mode = childEntry.mode;
+        if (child.hash === null) child.hash = childEntry.hash;
         tree[i] = child;
       });
       return callback(null, tree, entry);
@@ -96,6 +100,53 @@ module.exports = function (repo) {
     function onBody(err, body) {
       if (err) return callback(err);
       return callback(null, body, entry);
+    }
+  }
+
+  function updateParent(path, child, callback) {
+    var parent;
+    var entries;
+    readTree(path, onTree);
+
+    function onTree(err, data, entry) {
+      if (err) return callback(err);
+      entries = data;
+      parent = entry;
+      for (var i = 0, l = entries.length; i < l; i++) {
+        entry = entries[i];
+        if (entry.name !== child.name) continue;
+        return repo.saveAs("tree", entries, onSave);
+      }
+      entries.push(child);
+      return repo.saveAs("tree", entries, onSave);
+    }
+
+    function onSave(err, hash) {
+      if (err) return callback(err);
+      parent.hash = hash;
+      if (exports.onChange) exports.onChange(path, entries, parent);
+      if (parent.parent !== null) {
+        return updateParent(parent.parent, parent, callback);
+      }
+      return callback();
+    }
+  }
+
+  function writeFile(path, body, callback) {
+    var entry = getEntry(path);
+    return repo.saveAs("blob", body, onHash);
+
+    function onHash(err, hash) {
+      if (err) return callback(err);
+      if (entry.hash === hash) return callback();
+      entry.hash = hash;
+      if (exports.onChange) exports.onChange(path, body, entry);
+      updateParent(entry.parent, entry, onUpdate);
+    }
+
+    function onUpdate(err) {
+      if (err) return callback(err);
+      callback(null, entry);
     }
   }
 
