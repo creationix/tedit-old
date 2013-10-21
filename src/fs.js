@@ -132,8 +132,8 @@ module.exports = function (repo) {
         entries.push(entry);
       }
 
-      if (tree.parent && entries.length === 0) {
-        tree.hash = null;
+      if (tree.name && entries.length === 0) {
+        tree.hash = false;
         return updateParent(tree, callback);
       }
       return repo.saveAs("tree", entries, function (err, hash) {
@@ -149,7 +149,7 @@ module.exports = function (repo) {
 
   function deleteFile(path, callback) {
     var entry = getEntry(path);
-    entry.hash = null;
+    entry.hash = false;
     return updateParent(entry, callback);
   }
 
