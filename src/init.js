@@ -39,6 +39,9 @@ module.exports = function (repo, callback) {
 
   function onCommit(err, hash) {
     if (err) return callback(err);
-    return repo.updateHead(hash, callback);
+    return repo.updateHead(hash, function (err) {
+      if (err) return callback(err);
+      callback(null, hash);
+    });
   }
 };

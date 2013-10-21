@@ -48,18 +48,21 @@ function wrap(fn) {
 chrome.storage.local.clear();
 
 newRepo("test", wrap(function (repo) {
+  var head;
   var fs = newFileSystem(repo);
   fs.onChange = function (path, value, entry) {
-    console.log("CHANGE", path, entry.hash);
+    if (value) console.log("CHANGE", path, value, entry.hash);
+    else console.log("DELETE", path, value, entry.hash);
   }
   return repo.getHead(wrap(onHead));
 
-  function onHead(head) {
-    if (head) return onReady();
+  function onHead(hash) {
+    if (hash) return onReady(hash);
     return require('./init.js')(repo, wrap(onReady));
   }
 
-  function onReady() {
+  function onReady(hash) {
+    head = hash;
     log("repo", repo);
     log("fs", {
       "/": fs.getEntry("").hash,
@@ -96,6 +99,48 @@ newRepo("test", wrap(function (repo) {
       "/app": fs.getEntry("app").hash,
       "/app/sample.txt": fs.getEntry("app/sample.txt").hash,
     });
+    var commit = {
+      tree: fs.getEntry("").hash,
+      parent: head,
+      author: { name: "Tim Caswell", email: "tim@creationix.com" },
+      message: "Update code"
+    };
+    console.log("HEAD", head)
+    repo.saveAs("commit", commit, wrap(function (hash) {
+      return repo.updateHead(hash, wrap(function () {
+        head = hash;
+        console.log("HEAD", head);
+        repo.logWalk("HEAD", wrap(onStream));
+      }));
+    }));
+  }
+
+  function onStream(history) {
+    history.read(wrap(onRead));
+
+    function onRead(commit) {
+      if (!commit) {
+        return fs.deleteFile("app/sample.txt", wrap(onDelete));
+      }
+      console.log(commit.hash, commit.message);
+      repo.treeWalk(commit.tree, wrap(onStream2));
+    }
+
+    function onStream2(files) {
+      files.read(wrap(onFile));
+
+      function onFile(file) {
+        if (!file) {
+          return history.read(wrap(onRead));
+        }
+        console.log(file.hash, file.path);
+        files.read(wrap(onFile));
+      }
+    }
+  }
+
+  function onDelete() {
+    console.log("DONE");
   }
 
 }));

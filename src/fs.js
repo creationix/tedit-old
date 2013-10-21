@@ -11,6 +11,7 @@ module.exports = function (repo) {
   var exports = {
     readAs: readAs,
     writeFile: writeFile,
+    deleteFile: deleteFile,
     getEntry: getEntry,
     paths: paths
   };
@@ -103,33 +104,46 @@ module.exports = function (repo) {
     }
   }
 
-  function updateParent(path, child, callback) {
-    var parent;
-    var entries;
-    readTree(path, onTree);
-
-    function onTree(err, data, entry) {
+  // Changes is a hash where key is name and value is action:
+  //   true (update) or false (delete)
+  function updateTree(path, toDelete, callback) {
+    var entries, tree;
+    return readTree(path, function (err, e, t) {
       if (err) return callback(err);
-      entries = data;
-      parent = entry;
-      for (var i = 0, l = entries.length; i < l; i++) {
-        entry = entries[i];
-        if (entry.name !== child.name) continue;
+      entries = e;
+      tree = t;
+      if (toDelete) {
+        for (var i = entries.length - 1; i >= 0; i--) {
+          var entry = entries[i];
+          if (toDelete !== entry.name) continue;
+          entries.splice(i, 1);
+          if (exports.onChange) {
+            var childPath = path + "/" + entry.name;
+            exports.onChange(childPath, null, entry);
+          }
+          break;
+        }
+      }
+      if (entries.length || tree.parent === null) {
         return repo.saveAs("tree", entries, onSave);
       }
-      entries.push(child);
-      return repo.saveAs("tree", entries, onSave);
-    }
+      return updateTree(tree.parent, tree.name, callback);
+    });
 
     function onSave(err, hash) {
       if (err) return callback(err);
-      parent.hash = hash;
-      if (exports.onChange) exports.onChange(path, entries, parent);
-      if (parent.parent !== null) {
-        return updateParent(parent.parent, parent, callback);
-      }
-      return callback();
+      if (hash === tree.hash) return callback();
+      tree.hash = hash;
+      if (exports.onChange) exports.onChange(path, entries, tree);
+      if (tree.parent !== null) return updateTree(tree.parent, null, callback);
+      callback();
     }
+
+  }
+
+  function deleteFile(path, callback) {
+    var entry = getEntry(path);
+    return updateTree(entry.parent, entry.name, callback);
   }
 
   function writeFile(path, body, callback) {
@@ -141,7 +155,7 @@ module.exports = function (repo) {
       if (entry.hash === hash) return callback();
       entry.hash = hash;
       if (exports.onChange) exports.onChange(path, body, entry);
-      updateParent(entry.parent, entry, onUpdate);
+      updateTree(entry.parent, null, onUpdate);
     }
 
     function onUpdate(err) {
