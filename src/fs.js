@@ -13,9 +13,26 @@ module.exports = function (repo) {
     writeFile: writeFile,
     deleteFile: deleteFile,
     getEntry: getEntry,
+    commit: commit,
     paths: paths
   };
   return exports;
+
+  function commit(meta, callback) {
+    repo.readRef("HEAD", function (err, head) {
+      if (err && err.code !== "ENOENT") return callback(err);
+      repo.readRef("tags/current", function (err, current) {
+        if (err && err.code !== "ENOENT") return callback(err);
+        if (!current) return callback();
+        if (head) meta.parent = head;
+        meta.tree = current;
+        repo.saveAs("commit", meta, function (err, hash) {
+          if (err) return callback(err);
+          repo.updateHead(hash, callback);
+        });
+      });
+    });
+  }
 
   // Get a path entry
   function getEntry(path) {
@@ -51,9 +68,16 @@ module.exports = function (repo) {
     if (entry.hash) return callback();
 
     if (entry.parent === null) {
-      return repo.loadAs("commit", "HEAD", onHead);
+      return repo.readRef("tags/current", onCurrent);
     }
     return readTree(entry.parent, onParent);
+
+    function onCurrent(err, hash) {
+      if (err) return callback(err);
+      if (hash === undefined) return repo.loadAs("commit", "HEAD", onHead);
+      entry.hash = hash;
+      return callback(null, entry);
+    }
 
     function onHead(err, head) {
       if (head === undefined) return callback(err, entry);
@@ -142,7 +166,7 @@ module.exports = function (repo) {
         tree.hash = hash;
         if (exports.onChange) exports.onChange(entry.parent, entries, tree);
         if (tree.parent !== null) return updateParent(tree, callback);
-        callback();
+        repo.createRef("tags/current", hash, callback);
       });
     });
   }
