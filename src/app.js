@@ -2,6 +2,7 @@ var gitProject = require('./gitfs.js');
 var SplitView = require('./SplitView.js');
 var LogView = require('./LogView.js');
 var Editor = require('./Editor.js');
+var TreeView = require('./TreeView.js');
 
 var body = new SplitView({
   orientation: "bottom",
@@ -11,7 +12,22 @@ var body = new SplitView({
     orientation: "left",
     size: Math.min(200, window.innerWidth >> 1),
     main: new Editor(require('./sample.js#txt'), {
-      "Ctrl-Enter": require('./run.js')
+      "Ctrl-Enter": require('./run.js'),
+      "Ctrl-0": function (cm) {
+        size = 16;
+        zoom();
+        cm.refresh();
+      },
+      "Ctrl-=": function (cm) {
+        size *= 1.1;
+        zoom();
+        cm.refresh();
+      },
+      "Ctrl--": function (cm) {
+        size /= 1.1;
+        zoom();
+        cm.refresh();
+      },
     }),
   }),
   side: new LogView()
@@ -24,9 +40,18 @@ gitProject("test", function (err, fs) {
 });
 
 window.addEventListener('resize', onResize, true);
+var width, height, size = 16;
 onResize();
+zoom();
 function onResize() {
-  body.resize(window.innerWidth, window.innerHeight);
+  var newWidth = window.innerWidth;
+  var newHeight = window.innerHeight;
+  if (newWidth === width && newHeight === height) return;
+  width = newWidth, height = newHeight;
+  body.resize(width, height);
+}
+function zoom() {
+  document.body.style.fontSize = size + "px";
 }
 
 

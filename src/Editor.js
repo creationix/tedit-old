@@ -16,5 +16,5 @@ function Editor(code, extraKeys) {
 Editor.prototype.resize = function (width, height) {
   this.el.style.width = width + "px";
   this.el.style.height = height + "px";
-  this.cm.setSize(width, height);
+  this.cm.refresh();
 };
