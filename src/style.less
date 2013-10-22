@@ -1,12 +1,15 @@
 @import "codemirror.less";
 @import "ambiance.less";
+@import "icons.less";
 
 @import "splitview.less";
 
+*, *:before, *:after {
+  -moz-box-sizing: border-box; -webkit-box-sizing: border-box; box-sizing: border-box;
+}
+
 body {
   margin: 0;
-  color: #fff;
-  background-color: #333;
 }
 
 .CodeMirror {
@@ -15,4 +18,51 @@ body {
 .CodeMirror, .log {
   font-family: "Ubuntu Mono", Monaco, Menlo, "Andale Mono", "lucida console", "Courier New", monospace !important;
   font-size: 1em;
+}
+
+.log {
+  padding: 0.3em;
+  li {
+    padding: 0 !important;
+  }
+}
+.tree {
+  overflow: auto;
+  color: #fff;
+  padding: 0.3em;
+  background-color: #111;
+  ul {
+    margin: 0;
+    padding: 0;
+    line-height: 1.4em;
+    list-style-type: none;
+    ul {
+      padding-left: 0.7em;
+    }
+  }
+  li {
+    white-space: nowrap;
+  }
+  .row {
+    margin-left: -10em;
+    padding-left: 10em;
+    margin-right: -1em;
+    padding-right: 1em;
+    cursor: pointer;
+    &:hover {
+      background-color: #222;
+    }
+  }
+  i.icon-folder-open, i.icon-folder {
+    color: #aac6e3;
+  }
+  i.icon-picture, i.icon-video {
+    color: #8f9d6a;
+  }
+  i.icon-doc, i.icon-doc-text {
+    color: #cda869;
+  }
+  i.icon-box {
+    color: #bbc;
+  }
 }
