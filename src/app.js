@@ -12,136 +12,114 @@ var platform = {
   sha1: require('git-sha1'),
   bops: require('bops-browser')
 };
+
 var jsGit = require('js-git')(platform);
 var localDb = require('git-chrome-local-db')(platform);
 var newFileSystem = require('./fs.js');
 
-function newRepo(name, callback) {
-  if (!callback) return newRepo.bind(this, name);
-  var db = localDb(name);
-  var repo = jsGit(db);
-  return db.init(function(err) {
+// chrome.storage.local.clear();
+var db = localDb("test");
+var repo = jsGit(db);
+var fs = newFileSystem(repo);
+fs.onChange = function (path, value, entry) {
+  if (value) console.log("CHANGE", path, entry.hash);
+  else console.log("DELETE", path);
+};
+
+var author = {name: "Tim Caswell", email: "tim@creationix.com"};
+
+serial(
+  db.init(),
+  walk(),
+
+  fs.writeFile("/tedit/package.json", require('../package.json#txt')),
+  fs.commit({ author: author, message: "Create package.json" }),
+  walk(),
+
+  fs.writeFile("/tedit/src/app.js", require('./app.js#txt')),
+  fs.writeFile("/tedit/src/fs.js", require('./fs.js#txt')),
+  fs.commit({ author: author, message: "Add app and fs code." }),
+  walk(),
+
+  fs.deleteFile("/tedit/package.json"),
+  fs.commit({ author: author, message: "Delete package.json." }),
+  walk(),
+
+  fs.deleteFile("/tedit/src/app.js"),
+  fs.commit({ author: author, message: "Delete sample app." }),
+  walk()
+)(function (err) {
+  if (err) return log(err);
+  console.log("Done");
+});
+
+function walk(callback) {
+  if (!callback) return walk;
+  var history, tree, head, current;
+  repo.loadAs("commit", "HEAD", onHead);
+  function onHead(err, result) {
+    head = result && result.tree;
+    return repo.readRef("tags/current", onCurrent);
+  }
+  function onCurrent(err, result) {
+    current = result;
+    if (current && current !== head) {
+      return onCommit(null, {
+        message: "Uncommitted tree",
+        tree: current
+      });
+    }
+    if (head) return onEntry();
+    console.log("Empty repo");
+    return callback();
+  }
+
+  function onHistory(err, result) {
+    if (result === undefined) return callback(err);
+    history = result;
+    history.read(onCommit);
+  }
+
+  function onCommit(err, commit) {
+    if (commit === undefined) return callback(err);
+    console.log(commit.hash, commit.message);
+    repo.treeWalk(commit.tree, onTree);
+  }
+
+  function onTree(err, result) {
+    if (result === undefined) return callback(err);
+    tree = result;
+    tree.read(onEntry);
+  }
+
+  function onEntry(err, entry) {
     if (err) return callback(err);
-    callback(null, repo);
-  });
+    if (!entry) {
+      if (history) return history.read(onCommit);
+      if (head) return repo.logWalk("HEAD", onHistory);
+      return callback();
+    }
+    console.log(entry.hash, entry.path, entry.type);
+    tree.read(onEntry);
+  }
 }
 
-function wrap(fn) {
-  if (typeof fn !== "function") {
-    var err = new TypeError("fn must be a function");
-    return log(err);
-  }
-  return function (err) {
-    if (err) {
-      return log(err);
-    }
-    var args = Array.prototype.slice.call(arguments, 1);
-    try {
-      fn.apply(null, args);
-    }
-    catch (err) {
-      return log(err);
-    }
+// Mini control-flow library
+function serial() {
+  var i = 0, steps = arguments, callback;
+  return function (cb) {
+    callback = cb;
+    return next();
   };
+
+  function next(err) {
+    if (err) return callback(err);
+    var step = steps[i++];
+    if (!(typeof step === 'function' && step.length === 1)) {
+      throw new TypeError("Step is not continuable: " + step);
+    }
+    if (!step) return callback();
+    return step(next);
+  }
+
 }
-
-chrome.storage.local.clear();
-
-newRepo("test", wrap(function (repo) {
-  var head;
-  var fs = newFileSystem(repo);
-  fs.onChange = function (path, value, entry) {
-    if (value) console.log("CHANGE", path, value, entry.hash);
-    else console.log("DELETE", path, value, entry.hash);
-  }
-  return repo.getHead(wrap(onHead));
-
-  function onHead(hash) {
-    if (hash) return onReady(hash);
-    return require('./init.js')(repo, wrap(onReady));
-  }
-
-  function onReady(hash) {
-    head = hash;
-    log("repo", repo);
-    log("fs", {
-      "/": fs.getEntry("").hash,
-      "/app": fs.getEntry("app").hash,
-      "/app/sample.txt": fs.getEntry("app/sample.txt").hash,
-    });
-    fs.readAs("text", "app/sample.txt", wrap(onFile));
-  }
-
-  function onFile(body, entry) {
-    log(entry, body);
-    log("fs", {
-      "/": fs.getEntry("").hash,
-      "/app": fs.getEntry("app").hash,
-      "/app/sample.txt": fs.getEntry("app/sample.txt").hash,
-    });
-    fs.writeFile("app/sample.txt", "This is new content!\n", wrap(onSave));
-  }
-
-  function onSave(entry) {
-    log(entry);
-    log("fs", {
-      "/": fs.getEntry("").hash,
-      "/app": fs.getEntry("app").hash,
-      "/app/sample.txt": fs.getEntry("app/sample.txt").hash,
-    });
-    fs.writeFile("app/sample.txt", "This is new content!\n", wrap(onSave2));
-  }
-
-  function onSave2(entry) {
-    log(entry);
-    log("fs", {
-      "/": fs.getEntry("").hash,
-      "/app": fs.getEntry("app").hash,
-      "/app/sample.txt": fs.getEntry("app/sample.txt").hash,
-    });
-    var commit = {
-      tree: fs.getEntry("").hash,
-      parent: head,
-      author: { name: "Tim Caswell", email: "tim@creationix.com" },
-      message: "Update code"
-    };
-    console.log("HEAD", head)
-    repo.saveAs("commit", commit, wrap(function (hash) {
-      return repo.updateHead(hash, wrap(function () {
-        head = hash;
-        console.log("HEAD", head);
-        repo.logWalk("HEAD", wrap(onStream));
-      }));
-    }));
-  }
-
-  function onStream(history) {
-    history.read(wrap(onRead));
-
-    function onRead(commit) {
-      if (!commit) {
-        return fs.deleteFile("app/sample.txt", wrap(onDelete));
-      }
-      console.log(commit.hash, commit.message);
-      repo.treeWalk(commit.tree, wrap(onStream2));
-    }
-
-    function onStream2(files) {
-      files.read(wrap(onFile));
-
-      function onFile(file) {
-        if (!file) {
-          return history.read(wrap(onRead));
-        }
-        console.log(file.hash, file.path);
-        files.read(wrap(onFile));
-      }
-    }
-  }
-
-  function onDelete() {
-    console.log("DONE");
-  }
-
-}));
-
