@@ -12,9 +12,7 @@ module.exports = function (repo) {
     readAs: readAs,
     writeFile: writeFile,
     deleteFile: deleteFile,
-    getEntry: getEntry,
     commit: commit,
-    paths: paths
   };
   return exports;
 

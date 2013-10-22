@@ -1,47 +1,20 @@
-
+var serial = require('./serial.js');
 // The job of this module is to create a new local git repository
 // complete with a sample commit if none exists.
-module.exports = function (repo, callback) {
-  return repo.setHead("master", onSet);
+module.exports = init;
+var author = {name: "Tim Caswell",email: "tim@creationix.com"};
 
-  function onSet(err) {
-    if (err) return callback(err);
-    return repo.saveAs("blob", require('./sample.js#txt'), onBlob);
-  }
+function init(db, fs, callback) {
+  if (callback) return init(db, fs)(callback);
+  chrome.storage.local.clear();
+  return serial(
+    db.init(),
+    fs.writeFile("/tedit/package.json", require('../package.json#txt')),
+    fs.commit({ author: author, message: "Create package.json" }),
+    fs.writeFile("/tedit/src/app.js", require('./app.js#txt')),
+    fs.writeFile("/tedit/src/fs.js", require('./fs.js#txt')),
+    fs.commit({ author: author, message: "Add app and fs code." }),
+    fs.writeFile("/sample.js", require('./sample.js#txt'))
+  );
+}
 
-  function onBlob(err, hash) {
-    if (err) return callback(err);
-    var tree = [
-      { mode: 0100644, name: "sample.txt", hash: hash }
-    ];
-    console.log("Creating tree", tree);
-    return repo.saveAs("tree", tree, onTree);
-  }
-
-  function onTree(err, hash) {
-    if (err) return callback(err);
-    var tree = [
-      { mode: 040000, name: "app", hash: hash }
-    ];
-    console.log("Creating parent tree", tree);
-    return repo.saveAs("tree", tree, onTree2);
-  }
-
-  function onTree2(err, hash) {
-    if (err) return callback(err);
-    var commit = {
-      tree: hash,
-      author: { name: "Tim Caswell", email: "tim@creationix.com" },
-      message: "Create Repository with Sample Code"
-    };
-    return repo.saveAs("commit", commit, onCommit);
-  }
-
-  function onCommit(err, hash) {
-    if (err) return callback(err);
-    return repo.updateHead(hash, function (err) {
-      if (err) return callback(err);
-      callback(null, hash);
-    });
-  }
-};

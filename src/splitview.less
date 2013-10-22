@@ -1,0 +1,26 @@
+.splitview, .splitview > * {
+  position: absolute;
+  overflow: hidden;
+}
+.splitview > .slider {
+  background-color: rgba(255,255,255,0.5);
+  z-index: 10;
+}
+.splitview.horizontal > .slider {
+  width: 4px;
+  border-right: 1px solid rgba(0,0,0,0.5);
+  top: 0;
+  bottom: 0;
+}
+.splitview.vertical > .slider {
+  height: 4px;
+  border-bottom: 1px solid rgba(0,0,0,0.5);
+  left: 0;
+  right: 0;
+}
+.splitview.horizontal > .slider:hover {
+  cursor: ew-resize;
+}
+.splitview.vertical > .slider:hover {
+  cursor: ns-resize;
+}
