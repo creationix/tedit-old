@@ -19,13 +19,19 @@ module.exports = function (repo) {
   return exports;
 
   function commit(meta, callback) {
-    repo.readRef("HEAD", function (err, head) {
-      if (err && err.code !== "ENOENT") return callback(err);
-      repo.readRef("tags/current", function (err, current) {
-        if (err && err.code !== "ENOENT") return callback(err);
-        if (!current) return callback();
-        if (head) meta.parent = head;
+    if (!callback) return commit.bind(this, meta);
+    repo.readRef("tags/current", function (err, current) {
+      if (err) return callback(err);
+      if (!current) {
+        return callback(new Error("No current state to commit"));
+      }
+      repo.loadAs("commit", "HEAD", function (err, head, hash) {
+        if (err) return callback(err);
+        if (head && head.tree === current) {
+          return callback(new Error("No changes to commit"));
+        }
         meta.tree = current;
+        if (head) meta.parent = hash;
         repo.saveAs("commit", meta, function (err, hash) {
           if (err) return callback(err);
           repo.updateHead(hash, callback);
@@ -116,6 +122,7 @@ module.exports = function (repo) {
   }
 
   function readAs(type, path, callback) {
+    if (!callback) return readAs.bind(this, type, path);
     if (type === "tree") return readTree(path, callback);
     var entry = getEntry(path);
     return loadHash(entry, onHash);
@@ -172,12 +179,14 @@ module.exports = function (repo) {
   }
 
   function deleteFile(path, callback) {
+    if (!callback) return deleteFile.bind(this, path);
     var entry = getEntry(path);
     entry.hash = false;
     return updateParent(entry, callback);
   }
 
   function writeFile(path, body, callback) {
+    if (!callback) return writeFile.bind(this, path, body);
     var entry = getEntry(path);
     entry.mode = entry.mode || 0100644;
     return repo.saveAs("blob", body, onHash);
