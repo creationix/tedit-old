@@ -12,9 +12,9 @@ module.exports = function (name, callback) {
   var repo = jsGit(db);
   var fs = newFileSystem(repo);
   fs.name = name;
-  // require('./init.js')(db, fs, onInit);
-  db.init(onInit);
-  
+  require('./init.js')(db, fs, onInit);
+  // db.init(onInit);
+
   function onInit(err) {
     if (err) return callback(err);
     callback(null, fs);

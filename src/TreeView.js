@@ -1,12 +1,32 @@
 var domBuilder = require('dombuilder');
 module.exports = TreeView;
 
-// Git file modes:
-// 0040000 16384 "tree" - tree
-// 0100644 33188 "blob" - file
-// 0100755 33261 "blob" - executable file
-// 0120000 40960 "blob" - symlink
-// 0160000 57344 "commit" - gitlink
+var mimes = {
+  "text/javascript": /\.js$/i,
+  "text/css": /\.css$/i,
+  "text/html": /\.html?$/i,
+  "text/x-markdown": /\.(?:md|markdown)$/i,
+  "text/xml": /\.(?:xml|svg)$/i,
+  "text/typescript": /\.ts$/i,
+  "application/json": /\.json$/i,
+  "image/png": /\.png$/i,
+  "image/jpeg": /\.jpe?g$/i,
+  "image/gif": /\.gif$/i,
+  "video/mpeg": /\.mpe?g$/i,
+  "video/mp4": /\.(?:mp4|m4v)$/i,
+  "video/ogg": /\.ogg$/i,
+  "video/webm": /\.webm$/i,
+  "application/zip": /\.zip$/i,
+  "application/gzip": /\.(?:gz|tgz)$/i,
+  "text/plain": /(?:^(?:README|LICENSE)|\.(?:txt|log)$)/i,
+};
+
+function getMime(path) {
+  for (var mime in mimes) {
+    if (mimes[mime].test(path)) return mime;
+  }
+  return "application/octet-stream";
+}
 
 function event(fn) {
   return function (evt) {
@@ -21,7 +41,7 @@ function folderFirst(a, b) {
 }
 
 
-function TreeView(fs, autoOpen) {
+function TreeView(fs, editor) {
 
   var opened = { "": true };
 
@@ -100,14 +120,47 @@ function TreeView(fs, autoOpen) {
 
   function renderFile(entry) {
     var $ = {};
+    var mime = getMime(entry.name);
+    var action, icon;
+    if (/(?:\/json$|^text\/)/.test(mime)) {
+      icon = "icon-doc-text";
+      action = editCode;
+    }
+    else if (/^image\//.test(mime)) {
+      icon = "icon-picture";
+      action = viewImage;
+    }
+    else if (/^video\//.test(mime)) {
+      icon = "icon-video";
+      action = viewVideo;
+    }
+    else {
+      icon = "icon-doc";
+    }
+    var attrib = { title: entry.hash };
+    if (action) attrib.onclick = event(action);
     return domBuilder(["li",
-      [".row$row", { title:entry.hash, onclick: event(toggle) },
-        ["i.icon-doc"], entry.name
+      [".row$row", attrib,
+        ["i", { class: icon }], entry.name
       ],
     ], $);
 
-    function toggle() {
-      console.log("file", entry);
+    function editCode() {
+      fs.readAs("text", entry.parent + "/" + entry.name, function (err, text, entry) {
+        if (err) return console.log(err);
+        entry.value = text;
+        entry.mime = mime;
+        var old = editor.swap(entry);
+        console.log("TODO: handle old", old);
+      });
+    }
+
+    function viewImage() {
+      console.log("TODO: Image", entry, mime);
+    }
+
+    function viewVideo() {
+      console.log("TODO: Video", entry, mime);
     }
   }
 
@@ -125,21 +178,3 @@ TreeView.prototype.resize = function (width, height) {
   this.el.style.width = width + "px";
   this.el.style.height = height + "px";
 };
-
-
-// function
-//       ["li", [".row", ["i.icon-box"], "test"],
-//         ["ul$ul"]
-//       ],
-
-//       ["li", [".row", ["i.icon-folder-open"], "res"],
-//         ["ul",
-//           ["li", [".row", ["i.icon-video"], "video.m4a"]],
-//           ["li", [".row", ["i.icon-picture"], "picture.png"]],
-//           ["li", [".row", ["i.icon-doc"], "libuv.so"]],
-//         ]
-//       ],
-//       ["li", [".row", ["i.icon-folder"], "css"]],
-//       ["li", [".row", ["i.icon-doc-text"], "app.js"]],
-//     ]
-//   ]);

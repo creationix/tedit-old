@@ -14,6 +14,7 @@ function init(db, fs, callback) {
     fs.writeFile("/tedit/src/app.js", require('./app.js#txt')),
     fs.writeFile("/tedit/src/fs.js", require('./fs.js#txt')),
     fs.commit({ author: author, message: "Add app and fs code." }),
+    fs.writeFile("/tedit/src/index.html", require('./index.html#txt')),
     fs.writeFile("/sample.js", require('./sample.js#txt'))
   );
 }

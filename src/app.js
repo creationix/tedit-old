@@ -4,8 +4,7 @@ var LogView = require('./LogView.js');
 var Editor = require('./Editor.js');
 var TreeView = require('./TreeView.js');
 
-
-var body;
+var body, editor;
 gitProject("test", function (err, fs) {
   if (err) return console.log(err);
   body = new SplitView({
@@ -15,10 +14,10 @@ gitProject("test", function (err, fs) {
     main: new SplitView({
       orientation: "left",
       size: Math.min(200, window.innerWidth >> 1),
-      main: new Editor(require('./sample.js#txt'), {
+      main: editor = new Editor({
         "Ctrl-Enter": require('./run.js'),
       }),
-      side: new TreeView(fs, true)
+      side: new TreeView(fs, editor)
     }),
     side: new LogView()
   });
