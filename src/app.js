@@ -18,7 +18,7 @@ gitProject("test", function (err, fs) {
       main: new Editor(require('./sample.js#txt'), {
         "Ctrl-Enter": require('./run.js'),
       }),
-      side: new TreeView(fs)
+      side: new TreeView(fs, true)
     }),
     side: new LogView()
   });
@@ -36,23 +36,3 @@ function onResize() {
   body.resize(width, height);
 }
 
-
-// var db = localDb("test");
-// var repo = jsGit(db);
-// var fs = newFileSystem(repo);
-// fs.onChange = function (path, value, entry) {
-//   if (value) console.log("CHANGE", path, entry.hash);
-//   else console.log("DELETE", path);
-// };
-
-// var walk = require('./walk.js');
-// var initFs = require('./init.js');
-// var serial = require('./serial.js');
-
-// serial(
-//   initFs(db, fs),
-//   walk(repo)
-// )(function (err) {
-//   if (err) return console.log(err);
-//   console.log("Done");
-// });
