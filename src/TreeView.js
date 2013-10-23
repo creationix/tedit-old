@@ -1,3 +1,4 @@
+var CodeMirror = require('./codemirror.js');
 var domBuilder = require('dombuilder');
 module.exports = TreeView;
 
@@ -43,7 +44,12 @@ function folderFirst(a, b) {
 
 function TreeView(fs, editor) {
 
+  // Place to store list of folders that should remain open.
   var opened = { "": true };
+  // Place to store list of open files.
+  var docs = {};
+  var selected, reading = false;
+  var scratchpad;
 
   this.el = domBuilder([".tree", ["ul",
     renderTree({ root: fs.name })
@@ -51,7 +57,6 @@ function TreeView(fs, editor) {
 
   function renderTree(entry) {
     var $ = {};
-    var reading = false;
     var name, path, openIcon, closeIcon;
     if (entry.root) {
       name = entry.root;
@@ -119,7 +124,8 @@ function TreeView(fs, editor) {
   }
 
   function renderFile(entry) {
-    var $ = {};
+    var path = entry.parent + "/" + entry.name;
+    var $ = { path: path };
     var mime = getMime(entry.name);
     var action, icon;
     if (/(?:\/json$|^text\/)/.test(mime)) {
@@ -146,13 +152,38 @@ function TreeView(fs, editor) {
     ], $);
 
     function editCode() {
-      fs.readAs("text", entry.parent + "/" + entry.name, function (err, text, entry) {
+      var isNew = false;
+      if (reading) return;
+      if (selected) {
+        selected.row.classList.remove("selected");
+      }
+      else {
+        isNew = true;
+      }
+      if (selected === $) {
+        selected = null;
+        editor.swap(scratchpad);
+        return;
+      }
+      selected = $;
+      selected.row.classList.add("selected");
+
+      var doc = docs[path];
+      if (doc) return swap();
+
+      reading = true;
+      return fs.readAs("text", path, function (err, text) {
+        reading = false;
         if (err) return console.log(err);
-        entry.value = text;
-        entry.mime = mime;
-        var old = editor.swap(entry);
-        console.log("TODO: handle old", old);
+        doc = docs[path] = new CodeMirror.Doc(text, mime);
+        return swap();
       });
+
+      function swap() {
+        var old = editor.swap(doc);
+        if (isNew) scratchpad = old;
+      }
+
     }
 
     function viewImage() {

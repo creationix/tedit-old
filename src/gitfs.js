@@ -1,6 +1,10 @@
 var platform = {
   sha1: require('git-sha1'),
-  bops: require('bops-browser')
+  bops: require('bops-browser'),
+  trace: function (name, stream, message) {
+    if (stream) return stream;
+    console.log(name, message);
+  }
 };
 
 var jsGit = require('js-git')(platform);
@@ -12,8 +16,8 @@ module.exports = function (name, callback) {
   var repo = jsGit(db);
   var fs = newFileSystem(repo);
   fs.name = name;
-  require('./init.js')(db, fs, onInit);
-  // db.init(onInit);
+  // require('./init.js')(db, fs, onInit);
+  db.init(onInit);
 
   function onInit(err) {
     if (err) return callback(err);

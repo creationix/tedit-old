@@ -3,11 +3,9 @@ window.CodeMirror = CodeMirror;
 
 module.exports = Editor;
 
-
 var zooms = [
   25, 33, 50, 67, 75, 90, 100, 110, 120, 125, 150, 175, 200, 250, 300, 400, 500
 ];
-
 
 function Editor(extraKeys) {
   var index = zooms.indexOf(100);
@@ -52,19 +50,7 @@ Editor.prototype.resize = function (width, height) {
   this.cm.focus();
 };
 
-Editor.prototype.swap = function (entry) {
-  var old = this.entry;
-  if (old === entry) return old;
-  this.entry = entry;
-  var doc = entry.doc || new CodeMirror.Doc(
-    entry.value,
-    entry.mime
-  );
-  old.value = this.cm.getValue();
-  old.doc = this.cm.swapDoc(doc);
-  if (entry.value !== this.cm.getValue()) {
-    this.cm.setValue(entry.value);
-  }
-  this.cm.focus();
+Editor.prototype.swap = function (doc) {
+  var old = this.cm.swapDoc(doc);
   return old;
 };
