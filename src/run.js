@@ -8,7 +8,7 @@ function run(instance) {
     worker.terminate();
     worker = null;
   }
-  console.log.container.textContent = "";
+  // console.log.container.textContent = "";
   var userCode = instance.getValue();
   var total = userCode.split("\n").length;
   window.location.hash = encodeURI(userCode);

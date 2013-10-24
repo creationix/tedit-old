@@ -6,7 +6,7 @@ var author = {name: "Tim Caswell",email: "tim@creationix.com"};
 
 function init(db, fs, callback) {
   if (callback) return init(db, fs)(callback);
-  chrome.storage.local.clear();
+  // chrome.storage.local.clear();
   return serial(
     db.init(),
     fs.writeFile("/tedit/package.json", require('../package.json#txt')),

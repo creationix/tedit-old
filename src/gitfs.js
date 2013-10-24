@@ -8,7 +8,7 @@ var platform = {
 };
 
 var jsGit = require('js-git')(platform);
-var localDb = require('git-chrome-local-db')(platform);
+var localDb = require('git-indexeddb')(platform);
 var newFileSystem = require('./fs.js');
 
 module.exports = function (name, callback) {
