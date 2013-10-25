@@ -10,6 +10,7 @@
 
 body {
   margin: 0;
+  font-family: sans-serif;
 }
 
 .CodeMirror {
@@ -49,6 +50,15 @@ body {
     margin-right: -0.3em;
     padding-right: 0.3em;
     cursor: pointer;
+    &.dirty {
+      font-style: italic;
+      &:after {
+        content: "*";
+      }
+    }
+    &.staged {
+      font-weight: bold;
+    }
     &:hover {
       background-color: #222;
     }
@@ -56,16 +66,16 @@ body {
       background-color: #444;
     }
   }
-  i.icon-folder-open, i.icon-folder {
+  .icon-folder-open, .icon-folder {
     color: #aac6e3;
   }
-  i.icon-picture, i.icon-video {
+  .icon-picture, .icon-video {
     color: #8f9d6a;
   }
-  i.icon-doc, i.icon-doc-text {
+  .icon-doc, .icon-doc-text {
     color: #cda869;
   }
-  i.icon-box {
+  .icon-box {
     color: #bbc;
   }
 }
