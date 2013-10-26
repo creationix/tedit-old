@@ -18,10 +18,18 @@ If you close a directory with dirty contents, it stages everything
 dirty and then discards the non-folders and closed folders inside.
 */
 
-
 function TreeView(editor) {
 
   var selected;
+
+  this.saveCurrent = function () {
+    if (!selected) return;
+    var root = selected.parent;
+    while (root.parent) root = root.parent;
+    root.save(function () {
+      console.log("Saved");
+    });
+  };
 
   // The transient global scratchpad.
   var scratchpad;
@@ -123,6 +131,44 @@ function TreeView(editor) {
     return false;
   };
 
+  Tree.prototype.save = TreeSave;
+  function TreeSave(callback) {
+    if (!callback) return TreeSave.bind(this);
+    var self = this;
+    console.log("TreeSave", this);
+    // No children means nothing to save.
+    if (!this.children) return callback();
+    var left = 1;
+    this.children.forEach(function (child) {
+      if (child.dirty || child.children) {
+        left++;
+        child.save(check);
+      }
+    });
+    check();
+
+    function check(err) {
+      if (err) return self.emitError(err);
+      if (--left) return;
+
+      var value = self.children.map(function (child) {
+        return { mode: child.mode, name: child.name, hash: child.hash };
+      });
+
+      if (!(self.dirty || self.isDirty())) return callback();
+
+      // TODO: optimize by detecting if a save is needed.
+      return self.repo.saveAs("tree", value, function (err, hash) {
+        if (err) return self.onError(err);
+        self.value = value;
+        self.hash = hash;
+        self.dirty = false;
+        self.updateUI();
+        return callback();
+      });
+    }
+  }
+
   Tree.prototype.onClick = function () {
     if (!this.value) return this.load("tree");
 
@@ -136,8 +182,6 @@ function TreeView(editor) {
       }
       // If there are any dirty descendents, we can't close.
       if (this.children && this.hasDirtyChildren()) return;
-
-
 
       // TODO walk children saving any outstanding changes.
       // First remove all children of the ul.
@@ -165,7 +209,8 @@ function TreeView(editor) {
     if (this.value === null) return false;
     if (this.children.length !== this.value.length) return true;
     var length = this.value.length;
-    // TODO: sort children to match git sort order in cached value.
+    this.value.sort(byName);
+    this.children.sort(byName);
     for (var i = 0; i < length; i++) {
       var child = this.children[i];
       var entry = this.value[i];
@@ -184,6 +229,20 @@ function TreeView(editor) {
   File.prototype = Object.create(Node.prototype, {
     constructor: { value: File }
   });
+
+  File.prototype.save = function (callback) {
+    if (!this.dirty) return callback();
+    var self = this;
+    var value = this.doc.getValue();
+    this.repo.saveAs("blob", value, function (err, hash) {
+      if (err) return self.onError(err);
+      self.value = value;
+      self.hash = hash;
+      self.dirty = false;
+      self.updateUI();
+      return callback();
+    });
+  };
 
   File.prototype.onClick = function () {
     if (!this.value) return this.load("text");
@@ -252,6 +311,13 @@ TreeView.prototype.resize = function (width, height) {
 // Quick sort function that puts folders first by abusing their low mode value.
 function folderFirst(a, b) {
   return a.mode - b.mode;
+}
+
+// Sort using the same algorithm git uses internally to build trees
+function byName(a, b) {
+  a = a.name + "/";
+  b = b.name + "/";
+  return a < b ? -1 : a > b ? 1 : 0;
 }
 
 // Tiny mime library that helps us know which files we can edit and what icons to show.
