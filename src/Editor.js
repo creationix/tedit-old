@@ -54,3 +54,7 @@ Editor.prototype.swap = function (doc) {
   var old = this.cm.swapDoc(doc);
   return old;
 };
+
+Editor.prototype.newDoc = function (text, mime) {
+  return new CodeMirror.Doc(text, mime);
+};

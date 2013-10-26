@@ -1,24 +1,21 @@
-var CodeMirror = require('./codemirror.js');
 var domBuilder = require('dombuilder');
 module.exports = TreeView;
 
 /*
-Nodes by path can contain
+Nodes
 
- - hash - the git hash of the staged or commited value
- - name - filename
+ - repo - the js-git repo instance
  - mode - gitmode of entry
+ - name - filename
+ - hash - the git hash of the staged or commited value
  - parent - reference to parent tree (if any)
  - staged - there are saved, but uncommited changes
  - dirty - the value doesn't match the hash (unsaved)
- - entries - cached entries for open trees (raw value from js-git)
+ - children - cached entries for open trees (raw value from js-git)
  - doc - reference to the editor document
- - onchange - hook for gui code to update css classes
 
 If you close a directory with dirty contents, it stages everything
 dirty and then discards the non-folders and closed folders inside.
-
-
 */
 
 
@@ -115,14 +112,36 @@ function TreeView(editor) {
     constructor: { value: Tree }
   });
 
+  Tree.prototype.hasDirtyChildren = function () {
+    for (var i = 0, l = this.children.length; i < l; i++) {
+      var child = this.children[i];
+      if (child.dirty) return true;
+      if (child.children) {
+        if (child.hasDirtyChildren()) return true;
+      }
+    }
+    return false;
+  };
+
   Tree.prototype.onClick = function () {
     if (!this.value) return this.load("tree");
 
     // If we're already open, we need to close the folder
     if (this.children) {
+      // If selected is a descendent, we can't close.
+      var parent = selected && selected.parent;
+      while (parent) {
+        if (parent === this) return;
+        parent = parent.parent;
+      }
+      // If there are any dirty descendents, we can't close.
+      if (this.children && this.hasDirtyChildren()) return;
+
+
+
+      // TODO walk children saving any outstanding changes.
       // First remove all children of the ul.
       this.ul.textContent = "";
-      // TODO walk children saving any outstanding changes.
       this.children = null;
       return this.updateUI();
     }
@@ -175,16 +194,19 @@ function TreeView(editor) {
         // TODO: open non code files
         return;
       }
-      this.doc = new CodeMirror.Doc(this.value, mime);
+      // TODO: UTF-8 decode contents.
+      this.doc = editor.newDoc(this.value, mime);
       this.doc.on('change', this.onChange.bind(this));
     }
 
     if (selected === this) {
+      // Deselect a file reverting to the scratchpad
       selected = null;
       this.updateUI();
       editor.swap(scratchpad);
     }
     else if (selected) {
+      // Move selection to a new file
       var old = selected;
       selected = this;
       old.updateUI();
@@ -192,6 +214,7 @@ function TreeView(editor) {
       editor.swap(this.doc);
     }
     else {
+      // Stash scratchpad and select a file
       selected = this;
       this.updateUI();
       scratchpad = editor.swap(this.doc);
