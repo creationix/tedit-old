@@ -21,6 +21,6 @@ module.exports = function (name, callback) {
 
   function onInit(err) {
     if (err) return callback(err);
-    callback(null, fs);
+    callback(null, fs, repo, db);
   }
 };

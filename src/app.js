@@ -3,7 +3,7 @@ var SplitView = require('./SplitView.js');
 var Editor = require('./Editor.js');
 var TreeView = require('./TreeView.js');
 
-var body, editor;
+var body, tree, editor;
 
 body = new SplitView({
   el: document.body,
@@ -12,13 +12,15 @@ body = new SplitView({
   main: editor = new Editor({
     "Ctrl-Enter": require('./run.js'),
   }),
+  side: tree = new TreeView(editor),
 });
 window.addEventListener('resize', onResize, true);
 onResize();
 
-gitProject("test", function (err, fs) {
+gitProject("test", function (err, fs, repo, db) {
   if (err) return console.log(err);
-  body.addSide(new TreeView(fs, editor));
+  repo.name = "test";
+  tree.addRepo(repo);
 });
 
 var width, height;
