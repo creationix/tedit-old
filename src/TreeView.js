@@ -25,7 +25,11 @@ function TreeView(editor) {
     if (!selected) return;
     var root = selected.parent;
     while (root.parent) root = root.parent;
-    root.save(function () {});
+    root.save(function () {
+      root.repo.createRef("refs/tags/current", root.hash, function (err) {
+        if (err) return root.onError(err);
+      });
+    });
   };
 
   // The transient global scratchpad.
@@ -349,7 +353,7 @@ function onClick(node) {
 }
 
 function getRoot(repo, callback) {
-  return repo.readRef("tags/current", function (err, current) {
+  return repo.readRef("refs/tags/current", function (err, current) {
     if (err) return callback(err);
     if (current) return callback(null, current);
     return repo.loadAs("commit", "HEAD", function (err, head) {

@@ -18,7 +18,7 @@ module.exports = function (repo) {
 
   function commit(meta, callback) {
     if (!callback) return commit.bind(this, meta);
-    repo.readRef("tags/current", function (err, current) {
+    repo.readRef("refs/tags/current", function (err, current) {
       if (err) return callback(err);
       if (!current) {
         return callback(new Error("No current state to commit"));
@@ -72,7 +72,7 @@ module.exports = function (repo) {
     if (entry.hash) return callback();
 
     if (entry.parent === null) {
-      return repo.readRef("tags/current", onCurrent);
+      return repo.readRef("refs/tags/current", onCurrent);
     }
     return readTree(entry.parent, onParent);
 
@@ -171,7 +171,7 @@ module.exports = function (repo) {
         tree.hash = hash;
         if (exports.onChange) exports.onChange(entry.parent, entries, tree);
         if (tree.parent !== null) return updateParent(tree, callback);
-        repo.createRef("tags/current", hash, callback);
+        repo.createRef("refs/tags/current", hash, callback);
       });
     });
   }
