@@ -11,7 +11,6 @@ function run(instance) {
   // console.log.container.textContent = "";
   var userCode = instance.getValue();
   var total = userCode.split("\n").length;
-  window.location.hash = encodeURI(userCode);
 
   var code = template.replace("// userCode", userCode);
   var blob = new Blob([code], {type:"application/javascript"});

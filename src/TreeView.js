@@ -22,27 +22,12 @@ dirty and then discards the non-folders and closed folders inside.
 */
 
 
-  //     return fs.readAs("text", path, function (err, text) {
-  //       reading = false;
-  //       if (err) return console.log(err);
-  //       doc = docs[path] = new CodeMirror.Doc(text, mime);
-  //       doc.on('change', function (evt) {
-  //         var newText = doc.getValue();
-  //         console.log(entry.parent, entry.name, newText === text);
-  //       });
-  //       return swap();
-  //     });
-
-  //     function swap() {
-  //       var old = editor.swap(doc);
-  //       if (isNew) scratchpad = old;
-  //     }
-
-
-
 function TreeView(editor) {
 
   var selected;
+
+  // The transient global scratchpad.
+  var scratchpad;
 
   function Node(repo, mode, name, hash, parent) {
     this.repo = repo;
@@ -194,12 +179,23 @@ function TreeView(editor) {
       this.doc.on('change', this.onChange.bind(this));
     }
 
-    var old;
-    if (selected) old = selected;
-    selected = this;
-    if (old) old.updateUI();
-    this.updateUI();
-    editor.swap(this.doc);
+    if (selected === this) {
+      selected = null;
+      this.updateUI();
+      editor.swap(scratchpad);
+    }
+    else if (selected) {
+      var old = selected;
+      selected = this;
+      old.updateUI();
+      this.updateUI();
+      editor.swap(this.doc);
+    }
+    else {
+      selected = this;
+      this.updateUI();
+      scratchpad = editor.swap(this.doc);
+    }
   };
 
   File.prototype.onChange = function () {
@@ -208,12 +204,6 @@ function TreeView(editor) {
     this.dirty = dirty;
     this.updateUI();
   };
-
-  File.prototype.isDirty = function () {
-    if (this.value === null) return false;
-    return this.value !== this.doc.getValue();
-  };
-
 
   domBuilder([".tree$el", ["ul$ul"]], this);
 
