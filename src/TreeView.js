@@ -10,7 +10,6 @@ Nodes
  - hash - the git hash of the staged or commited value
  - parent - reference to parent tree (if any)
  - staged - there are saved, but uncommited changes
- - dirty - the value doesn't match the hash (unsaved)
  - children - cached entries for open trees (raw value from js-git)
  - doc - reference to the editor document
 
@@ -26,9 +25,7 @@ function TreeView(editor) {
     if (!selected) return;
     var root = selected.parent;
     while (root.parent) root = root.parent;
-    root.save(function () {
-      console.log("Saved");
-    });
+    root.save(function () {});
   };
 
   // The transient global scratchpad.
@@ -48,15 +45,13 @@ function TreeView(editor) {
     // The raw body from js-git of what's stored in hash
     // Used for dirty checking.
     this.value = null;
-    // The actual dirty flag
-    this.dirty = false;
     // Build uio elements
     domBuilder(["li$el",
       ["$rowEl", { onclick: onClick(this) },
         ["i$iconEl"], ["span$nameEl"]
       ]
     ], this);
-    this.updateUI();
+    this.onChange();
   }
 
   Node.prototype.onError = function (err) {
@@ -72,9 +67,9 @@ function TreeView(editor) {
     });
   };
 
-  Node.prototype.updateUI = function () {
+  Node.prototype.onChange = function () {
     var classes = ["row"];
-    if (this.dirty) classes.push("dirty");
+    if (this.isDirty()) classes.push("dirty");
     if (this.mode & 0111) classes.push("executable");
     if (selected === this) classes.push("selected");
     this.rowEl.setAttribute('class', classes.join(" "));
@@ -123,7 +118,7 @@ function TreeView(editor) {
   Tree.prototype.hasDirtyChildren = function () {
     for (var i = 0, l = this.children.length; i < l; i++) {
       var child = this.children[i];
-      if (child.dirty) return true;
+      if (child.isDirty()) return true;
       if (child.children) {
         if (child.hasDirtyChildren()) return true;
       }
@@ -135,12 +130,11 @@ function TreeView(editor) {
   function TreeSave(callback) {
     if (!callback) return TreeSave.bind(this);
     var self = this;
-    console.log("TreeSave", this);
     // No children means nothing to save.
     if (!this.children) return callback();
     var left = 1;
     this.children.forEach(function (child) {
-      if (child.dirty || child.children) {
+      if (child.isDirty() || child.children) {
         left++;
         child.save(check);
       }
@@ -155,15 +149,13 @@ function TreeView(editor) {
         return { mode: child.mode, name: child.name, hash: child.hash };
       });
 
-      if (!(self.dirty || self.isDirty())) return callback();
+      if (!self.isDirty()) return callback();
 
-      // TODO: optimize by detecting if a save is needed.
       return self.repo.saveAs("tree", value, function (err, hash) {
         if (err) return self.onError(err);
         self.value = value;
         self.hash = hash;
-        self.dirty = false;
-        self.updateUI();
+        self.onChange();
         return callback();
       });
     }
@@ -187,7 +179,7 @@ function TreeView(editor) {
       // First remove all children of the ul.
       this.ul.textContent = "";
       this.children = null;
-      return this.updateUI();
+      return this.onChange();
     }
 
     var self = this;
@@ -202,13 +194,13 @@ function TreeView(editor) {
     // Put folders first.
     this.children.sort(folderFirst);
     this.ul.appendChild(domBuilder(this.children.map(getEl)));
-    this.updateUI();
+    this.onChange();
   };
 
   Tree.prototype.isDirty = function () {
-    if (this.value === null) return false;
-    if (this.children.length !== this.value.length) return true;
+    if (this.value === null || this.children === null) return false;
     var length = this.value.length;
+    if (this.children.length !== length) return true;
     this.value.sort(byName);
     this.children.sort(byName);
     for (var i = 0; i < length; i++) {
@@ -230,16 +222,19 @@ function TreeView(editor) {
     constructor: { value: File }
   });
 
+  File.prototype.isDirty = function () {
+    return this.doc && this.value !== null && this.value !== this.doc.getValue();
+  };
+
   File.prototype.save = function (callback) {
-    if (!this.dirty) return callback();
+    if (!this.isDirty()) return callback();
     var self = this;
     var value = this.doc.getValue();
     this.repo.saveAs("blob", value, function (err, hash) {
       if (err) return self.onError(err);
       self.value = value;
       self.hash = hash;
-      self.dirty = false;
-      self.updateUI();
+      self.onChange();
       return callback();
     });
   };
@@ -261,31 +256,25 @@ function TreeView(editor) {
     if (selected === this) {
       // Deselect a file reverting to the scratchpad
       selected = null;
-      this.updateUI();
+      this.onChange();
       editor.swap(scratchpad);
     }
     else if (selected) {
       // Move selection to a new file
       var old = selected;
       selected = this;
-      old.updateUI();
-      this.updateUI();
+      old.onChange();
+      this.onChange();
       editor.swap(this.doc);
     }
     else {
       // Stash scratchpad and select a file
       selected = this;
-      this.updateUI();
+      this.onChange();
       scratchpad = editor.swap(this.doc);
     }
   };
 
-  File.prototype.onChange = function () {
-    var dirty = this.value !== this.doc.getValue();
-    if (dirty === this.dirty) return;
-    this.dirty = dirty;
-    this.updateUI();
-  };
 
   domBuilder([".tree$el", ["ul$ul"]], this);
 
