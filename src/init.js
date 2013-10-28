@@ -6,20 +6,17 @@ var author = {name: "Tim Caswell",email: "tim@creationix.com"};
 
 function init(db, fs, callback) {
   if (callback) return init(db, fs)(callback);
-  // chrome.storage.local.clear();
   return serial(
-    db.init(),
     db.clear(),
     db.init(),
-    fs.writeFile("/tedit/package.json", require('../package.json#txt')),
+    fs.writeFile("/package.json", require('../package.json#txt')),
     fs.commit({ author: author, message: "Create package.json" }),
-    fs.writeFile("/tedit/src/app.js", require('./app.js#txt')),
-    fs.writeFile("/tedit/src/fs.js", require('./fs.js#txt')),
-    fs.writeFile("/tedit/src/TreeView.js", require('./TreeView.js#txt')),
-    fs.writeFile("/tedit/src/Editor.js", require('./Editor.js#txt')),
+    fs.writeFile("/src/TreeView.js", require('./TreeView.js#txt')),
+    fs.writeFile("/src/Editor.js", require('./Editor.js#txt')),
+    fs.writeFile("/src/index.html", require('./index.html#txt')),
     fs.commit({ author: author, message: "Add app and fs code." }),
-    fs.writeFile("/tedit/src/index.html", require('./index.html#txt')),
-    fs.writeFile("/sample.js", require('./sample.js#txt'))
+    fs.writeFile("/samples/sample.js", require('./sample.js#txt')),
+    fs.commit({ author: author, message: "Add sample file." })
   );
 }
 

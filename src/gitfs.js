@@ -17,7 +17,13 @@ module.exports = function (name, callback) {
   var fs = newFileSystem(repo);
   fs.name = name;
   // require('./init.js')(db, fs, onInit);
-  db.init(onInit);
+  db.init(function (err) {
+    if (err) return callback(err);
+    db.get("HEAD", function (err, head) {
+      if (head) return onInit();
+      return require('./init.js')(db, fs, onInit);
+    });
+  });
 
   function onInit(err) {
     if (err) return callback(err);

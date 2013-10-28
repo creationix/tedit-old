@@ -366,11 +366,12 @@ function getRoot(repo, callback) {
     if (err) return callback(err);
     return repo.readRef("refs/tags/current", function (err, current) {
       if (err) return callback(err);
-      if (!head) return callback(null, current, commitTree);
+      current = current || head && head.tree;
       if (!current) return callback(new Error("No root at all"));
+      if (!head) return callback(null, current, commitTree);
       return walk("", head.tree, function (err) {
         if (err) return callback(err);
-        return callback(null, head.tree, commitTree);
+        return callback(null, current, commitTree);
       });
     });
   });
