@@ -1,6 +1,18 @@
 var domBuilder = require('dombuilder');
 module.exports = TreeView;
 
+
+
+
+/*
+
+ - tree of last commit and hashes.
+ - node stores path?
+    - what about moves and renames?
+    - I guess we'll have to update node and all children.
+*/
+
+
 /*
 Nodes
 
@@ -284,8 +296,9 @@ function TreeView(editor) {
 
   this.addRepo = function (repo) {
     var ul = this.ul;
-    getRoot(repo, function (err, hash) {
+    getRoot(repo, function (err, hash, hashes) {
       if (err) throw err;
+      console.log(hashes);
       var root = new Tree(repo, 040000, repo.name, hash, null);
       ul.appendChild(root.el);
       // Auto-open tree
@@ -353,13 +366,46 @@ function onClick(node) {
 }
 
 function getRoot(repo, callback) {
-  return repo.readRef("refs/tags/current", function (err, current) {
+  // path-to-hash lookup for the latest commit.
+  var commitTree = {};
+  return repo.loadAs("commit", "HEAD", function (err, head) {
     if (err) return callback(err);
-    if (current) return callback(null, current);
-    return repo.loadAs("commit", "HEAD", function (err, head) {
+    return repo.readRef("refs/tags/current", function (err, current) {
       if (err) return callback(err);
-      if (head) return callback(null, head.tree);
-      return callback(new Error("No root at all"));
+      if (!head) return callback(null, current, commitTree);
+      if (!current) return callback(new Error("No root at all"));
+      return walk("", head.tree, function (err) {
+        if (err) return callback(err);
+        return callback(null, head.tree, commitTree);
+      });
     });
   });
+
+
+  function walk(path, hash, callback) {
+    var done = false, left = 1;
+    commitTree[path] = hash;
+    repo.loadAs("tree", hash, function (err, tree) {
+      if (err) return callback(err);
+      tree.forEach(function (entry) {
+        var childPath = path + "/" + entry.name;
+        commitTree[childPath] = entry.hash;
+        if (entry.mode !== 040000) return;
+        left++;
+        return walk(childPath, entry.hash, check);
+      });
+      check();
+    });
+    function check(err) {
+      if (done) return;
+      if (err) {
+        done = true;
+        return callback(err);
+      }
+      if (--left) return;
+      done = true;
+      return callback();
+    }
+  }
+
 }
