@@ -1,22 +1,11 @@
 var domBuilder = require('dombuilder');
 module.exports = TreeView;
 
-
-
-
-/*
-
- - tree of last commit and hashes.
- - node stores path?
-    - what about moves and renames?
-    - I guess we'll have to update node and all children.
-*/
-
-
 /*
 Nodes
 
  - repo - the js-git repo instance
+ - path - path for matching with commit hashes
  - mode - gitmode of entry
  - name - filename
  - hash - the git hash of the staged or commited value
@@ -31,7 +20,9 @@ dirty and then discards the non-folders and closed folders inside.
 
 function TreeView(editor) {
 
-  var selected;
+  // selected is a reference to the currently selected node
+  // commitTree is a lookup of commit tree hashes for detecting staged changes.
+  var selected, commitTree;
 
   this.saveCurrent = function () {
     if (!selected) return;
@@ -58,6 +49,8 @@ function TreeView(editor) {
     this.hash = hash;
     // A reference to the parent tree if any.
     this.parent = parent;
+    // Calculate the path.
+    this.path = parent ? parent.path + "/" + name : "";
     // The raw body from js-git of what's stored in hash
     // Used for dirty checking.
     this.value = null;
@@ -87,6 +80,7 @@ function TreeView(editor) {
     var classes = ["row"];
     if (this.isDirty()) classes.push("dirty");
     if (this.mode & 0111) classes.push("executable");
+    if (this.hash !== commitTree[this.path]) classes.push("staged");
     if (selected === this) classes.push("selected");
     this.rowEl.setAttribute('class', classes.join(" "));
     this.rowEl.setAttribute('title', this.hash);
@@ -298,7 +292,7 @@ function TreeView(editor) {
     var ul = this.ul;
     getRoot(repo, function (err, hash, hashes) {
       if (err) throw err;
-      console.log(hashes);
+      commitTree = hashes;
       var root = new Tree(repo, 040000, repo.name, hash, null);
       ul.appendChild(root.el);
       // Auto-open tree
