@@ -9,6 +9,9 @@
       "scripts": ["background.js"]
     }
   },
+  "icons": {
+    "128": "icon-128.png"
+  },
   "permissions": [
     "storage",
     "unlimitedStorage",
