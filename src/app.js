@@ -11,7 +11,7 @@ body = new SplitView({
   size: Math.min(200, window.innerWidth >> 1),
   main: editor = new Editor({
     "Ctrl-Enter": require('./run.js'),
-    "Ctrl-S": function () { tree.saveCurrent(); },
+    "Ctrl-S": function () { tree.stageChanges(); },
   }),
   side: tree = new TreeView(editor),
 });

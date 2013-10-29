@@ -55,19 +55,22 @@ ul.contextMenu {
       background-color: #78CF8A;
       color: #000;
     }
-    &.sep {
+    &.disabled, &.sep {
       height: inherit;
       line-height: inherit;
       background-color: inherit;
       color: inherit;
       cursor: inherit;
+      opacity: 0.3;
+    }
+    &.sep {
       padding: 0;
       hr {
         margin: 0.2em 0.4em;
         height: 0;
         border: 0;
         height: 1px;
-        background-color: rgba(0,0,0,0.3);
+        background-color: #000;
       }
     }
   }

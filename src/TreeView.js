@@ -26,7 +26,8 @@ function TreeView(editor) {
   // commitTree is a lookup of commit tree hashes for detecting staged changes.
   var selected, commitTree;
 
-  this.saveCurrent = function () {
+  this.stageChanges = stageChanges;
+  function stageChanges() {
     if (!selected) return;
     var root = selected.parent;
     while (root.parent) root = root.parent;
@@ -35,7 +36,7 @@ function TreeView(editor) {
         if (err) return root.onError(err);
       });
     });
-  };
+  }
 
   // The transient global scratchpad.
   var scratchpad;
@@ -60,7 +61,17 @@ function TreeView(editor) {
       [".shield$shield", {onclick: closeMenu, oncontextmenu: closeMenu}],
       ["ul.contextMenu$ul", attrs, items.map(function (item) {
         if (item.sep) return ["li.sep", ["hr"]];
-        return ["li",
+        var attrs = {};
+        if (item.action) {
+          attrs.onclick = function (evt) {
+            item.action();
+            closeMenu(evt);
+          };
+        }
+        else {
+          attrs.class = "disabled";
+        }
+        return ["li", attrs,
           ["i", {class: "icon-" + item.icon}],
           item.label
         ];
@@ -70,6 +81,7 @@ function TreeView(editor) {
     this.close = closeMenu;
     function closeMenu(evt) {
       evt.preventDefault();
+      evt.stopPropagation();
       document.body.removeChild($.ul);
       document.body.removeChild($.shield);
       $ = null;
@@ -333,7 +345,7 @@ function TreeView(editor) {
 
   Tree.prototype.onContextMenu = function (evt) {
     var items = [];
-    if (this.hasDirtyChildren()) items.push({icon: "asterisk", label: "Stage all Changes"});
+    if (this.hasDirtyChildren()) items.push({icon: "asterisk", label: "Stage all Changes", action: stageChanges});
     if (this.hash !== commitTree[this.path]) {
       items.push({icon: "plus-squared", label: "Commit Staged Changes"});
     }
@@ -360,7 +372,7 @@ function TreeView(editor) {
 
   File.prototype.onContextMenu = function (evt) {
     var items = [];
-    if (this.isDirty()) items.push({icon: "asterisk", label: "Stage Changes"});
+    if (this.isDirty()) items.push({icon: "asterisk", label: "Stage All Changes", action: stageChanges});
     if (this.hash !== commitTree[this.path]) {
       items.push({icon: "plus-squared", label: "Commit Staged Changes"});
     }
