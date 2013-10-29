@@ -52,13 +52,15 @@ function TreeView(editor) {
     evt.preventDefault();
     evt.stopPropagation();
     var $ = {};
-    console.log(evt);
-    var attrs = {
-      css: {
-        left: evt.pageX + "px",
-        top: evt.pageY + "px",
-      }
-    };
+
+    var css = { left: evt.pageX + "px" };
+    if (evt.pageY < window.innerHeight / 2) {
+      css.top = evt.pageY + "px";
+    }
+    else {
+      css.bottom = (window.innerHeight - evt.pageY) + "px";
+    }
+    var attrs = { css: css };
     document.body.appendChild(domBuilder([
       [".shield$shield", {onclick: closeMenu, oncontextmenu: closeMenu}],
       ["ul.contextMenu$ul", attrs, items.map(function (item) {
