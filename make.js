@@ -3,6 +3,7 @@ var T = require('tim-task');
 
 T("build", T.parallel(
   T.copy("src/manifest.json", "app/manifest.json"),
+  T.copy("src/icon-196.png", "app/icon-196.png"),
   T.copy("src/background.js", "app/background.js"),
   T.copy("src/index.html", "app/index.html"),
   T.newer("src", /\.(?:less|css)$/, "app/style.css",
