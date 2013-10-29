@@ -18,6 +18,8 @@ If you close a directory with dirty contents, it stages everything
 dirty and then discards the non-folders and closed folders inside.
 */
 
+
+
 function TreeView(editor) {
 
   // selected is a reference to the currently selected node
@@ -37,6 +39,48 @@ function TreeView(editor) {
 
   // The transient global scratchpad.
   var scratchpad;
+
+  function ContextMenu(node, evt, items) {
+    if (node) {
+      var old = selected;
+      selected = node;
+      if (old) old.onChange();
+      node.onChange();
+    }
+
+    evt.preventDefault();
+    var $ = {};
+    var attrs = {
+      css: {
+        top: evt.y + "px",
+        left: evt.x + "px",
+      }
+    };
+    document.body.appendChild(domBuilder([
+      [".shield$shield", {onclick: closeMenu, oncontextmenu: closeMenu}],
+      ["ul.contextMenu$ul", attrs, items.map(function (item) {
+        if (item.sep) return ["li.sep", ["hr"]];
+        return ["li",
+          ["i", {class: "icon-" + item.icon}],
+          item.label
+        ];
+      })],
+    ], $));
+
+    this.close = closeMenu;
+    function closeMenu(evt) {
+      evt.preventDefault();
+      document.body.removeChild($.ul);
+      document.body.removeChild($.shield);
+      $ = null;
+      if (node) {
+        selected = old;
+        if (old) old.onChange();
+        node.onChange();
+      }
+    }
+  }
+
 
   function Node(repo, mode, name, hash, parent) {
     this.repo = repo;
@@ -60,6 +104,7 @@ function TreeView(editor) {
         ["i$iconEl"], ["span$nameEl"]
       ]
     ], this);
+    this.el.js = this;
     this.onChange();
   }
 
@@ -126,6 +171,7 @@ function TreeView(editor) {
   });
 
   Tree.prototype.hasDirtyChildren = function () {
+    if (!this.children) return false;
     for (var i = 0, l = this.children.length; i < l; i++) {
       var child = this.children[i];
       if (child.isDirty()) return true;
@@ -285,8 +331,68 @@ function TreeView(editor) {
     }
   };
 
+  Tree.prototype.onContextMenu = function (evt) {
+    var items = [];
+    if (this.hasDirtyChildren()) items.push({icon: "asterisk", label: "Stage all Changes"});
+    if (this.hash !== commitTree[this.path]) {
+      items.push({icon: "plus-squared", label: "Commit Staged Changes"});
+    }
+    items.push({icon: "doc-text", label: "Create File"});
+    items.push({icon: "folder", label: "Create Folder"});
+    items.push({icon: "link", label: "Create SymLink"});
+    items.push({icon: "edit", label: "Rename Folder"});
+    items.push({sep:true});
+    if (this.parent) {
+      items.push({icon: "trash", label: "Delete Folder"});
+    }
+    else {
+      if (this.remote) {
+        items.push({icon: "upload-cloud", label: "Push Changes to Remote"});
+        items.push({icon: "download-cloud", label: "Pull Changes from Remote"});
+      }
+      items.push({icon: "th-list", label: "View Commit History"});
+      items.push({icon: "tags", label: "View Tags and Branches"});
+      items.push({sep:true});
+      items.push({icon: "trash", label: "Remove Repository"});
+    }
+    new ContextMenu(this, evt, items);
+  };
+
+  File.prototype.onContextMenu = function (evt) {
+    var items = [];
+    console.log(this);
+    if (this.isDirty()) items.push({icon: "asterisk", label: "Stage changes to this file"});
+    items.push({icon: "edit", label: "Rename File"});
+    items.push({sep:true});
+    items.push({icon: "trash", label: "Delete File"});
+    new ContextMenu(this, evt, items);
+  };
+
+  this.onContextMenu = function (evt) {
+    var items = [];
+    items.push({icon: "box", label: "Create new local repository"});
+    items.push({sep:true});
+    items.push({icon: "github", label: "Clone from GitHub"});
+    items.push({icon: "bitbucket", label: "Clone from BitBucket"});
+    items.push({icon: "box", label: "Clone from custom URL"});
+    new ContextMenu(null, evt, items);
+  };
 
   domBuilder([".tree$el", ["ul$ul"]], this);
+
+  this.el.js = this;
+
+  var self = this;
+  this.el.addEventListener('contextmenu', function (evt) {
+    var target = evt.target;
+    while (target) {
+      if (target.js && target.js.onContextMenu) {
+        return target.js.onContextMenu(evt);
+      }
+      if (target === self.el) return;
+      target = target.parentElement;
+    }
+  }, false);
 
   this.addRepo = function (repo) {
     var ul = this.ul;
@@ -300,7 +406,6 @@ function TreeView(editor) {
     });
   };
 }
-
 
 TreeView.prototype.resize = function (width, height) {
   this.el.style.width = width + "px";

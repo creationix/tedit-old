@@ -27,6 +27,49 @@ body {
     padding: 0 !important;
   }
 }
+.shield {
+  position: absolute;
+  z-index: 11;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+ul.contextMenu {
+  position: absolute;
+  z-index: 12;
+  margin: 0;
+  padding: 0.2em 0;
+  box-shadow: 0 0 5px 5px rgba(0,0,0,0.5);
+  background-color: #fff;
+  color: #000;
+  list-style-type: none;
+  font-size: 0.9em;
+  li {
+    padding: 0.4em 1em 0.4em 0.4em;
+    cursor: pointer;
+    i {
+      margin-right: 0.4em;
+    }
+    &:hover {
+      background-color: hsl(38, 50%, 61%);
+      color: #000;
+    }
+    &.sep {
+      height: 0.5em;
+      line-height: 0.5em;
+      background-color: inherit;
+      color: inherit;
+      cursor: inherit;
+      hr {
+        margin: 0 -0.6em 0 0;
+        height: 0;
+        border-width: 1px 0 0 0;
+        border-color: rgba(0,0,0,0.3);
+      }
+    }
+  }
+}
 .tree {
   -webkit-user-select: none;
   user-select: none;
