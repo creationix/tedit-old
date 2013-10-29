@@ -238,14 +238,21 @@ function TreeView(editor) {
 
     // If we're already open, we need to close the folder
     if (this.children) {
-      // If selected is a descendent, we can't close.
-      var parent = selected && selected.parent;
-      while (parent) {
-        if (parent === this) return;
-        parent = parent.parent;
-      }
       // If there are any dirty descendents, we can't close.
       if (this.children && this.hasDirtyChildren()) return;
+
+      // If selected is a deselect it.
+      var parent = selected && selected.parent;
+      while (parent) {
+        if (parent === this) {
+          var old = selected;
+          old.onChange();
+          editor.swap(scratchpad);
+          selected = null;
+          break;
+        }
+        parent = parent.parent;
+      }
 
       // TODO walk children saving any outstanding changes.
       // First remove all children of the ul.
