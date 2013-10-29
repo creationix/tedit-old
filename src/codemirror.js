@@ -2,7 +2,6 @@
 //
 // CodeMirror is the only global var we claim
 module.exports = (function() {
-  "use strict";
 
   // BROWSER SNIFFING
 
