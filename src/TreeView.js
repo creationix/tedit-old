@@ -360,8 +360,10 @@ function TreeView(editor) {
 
   File.prototype.onContextMenu = function (evt) {
     var items = [];
-    console.log(this);
-    if (this.isDirty()) items.push({icon: "asterisk", label: "Stage changes to this file"});
+    if (this.isDirty()) items.push({icon: "asterisk", label: "Stage Changes"});
+    if (this.hash !== commitTree[this.path]) {
+      items.push({icon: "plus-squared", label: "Commit Staged Changes"});
+    }
     items.push({icon: "edit", label: "Rename File"});
     items.push({sep:true});
     items.push({icon: "trash", label: "Delete File"});
