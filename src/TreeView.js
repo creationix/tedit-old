@@ -50,11 +50,13 @@ function TreeView(editor) {
     }
 
     evt.preventDefault();
+    evt.stopPropagation();
     var $ = {};
+    console.log(evt);
     var attrs = {
       css: {
-        top: evt.y + "px",
-        left: evt.x + "px",
+        left: evt.pageX + "px",
+        top: evt.pageY + "px",
       }
     };
     document.body.appendChild(domBuilder([
