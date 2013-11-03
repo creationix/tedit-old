@@ -52,6 +52,7 @@ Editor.prototype.resize = function (width, height) {
 
 Editor.prototype.swap = function (doc) {
   var old = this.cm.swapDoc(doc);
+  this.cm.focus();
   return old;
 };
 

@@ -58,8 +58,8 @@ function TreeView(editor, git) {
             if (typeof item.action === "string") {
               item.action = node[item.action];
             }
-            item.action.call(node);
             closeMenu(evt);
+            item.action.call(node);
           };
         }
         else {
@@ -171,6 +171,17 @@ function TreeView(editor, git) {
     this.nameEl.textContent = this.name;
   };
 
+  Node.prototype.stageChanges = function () {
+    // Find the root tree
+    var root = this;
+    while (root.parent) root = root.parent;
+    root.save(function () {
+      root.repo.createRef("refs/tags/current", root.hash, function (err) {
+        if (err) return root.onError(err);
+      });
+    });
+  };
+
   Node.prototype.createCommit = function () {
 
     // Get information from the user.
@@ -273,7 +284,7 @@ function TreeView(editor, git) {
     // If we're already open, we need to close the folder
     if (this.children) {
       // If there are any dirty descendents, we can't close.
-      if (this.children && this.hasDirtyChildren()) return;
+      if (this.isDirty() || this.children && this.hasDirtyChildren()) return;
 
       // If selected is a deselect it.
       var parent = selected && selected.parent;
@@ -319,23 +330,36 @@ function TreeView(editor, git) {
     return new Constructor(this.repo, entry.mode, entry.name, entry.hash, this);
   };
 
-  Tree.prototype.createFile = function () {
-    var name = prompt("Enter new filename");
-    if (!name) return;
-    this.children.push(this.childFromEntry({
-      mode: 0100644,
-      name: name,
-      hash: null
-    }));
+  Tree.prototype.addChild = function (entry) {
+    var child = this.childFromEntry(entry);
+    this.children.push(child);
     this.orderChildren();
     this.onChange();
+    child.onClick();
+  };
+
+  Tree.prototype.createFile = function () {
+    var name = prompt("Enter name for new file");
+    if (!name) return;
+    this.addChild({
+      mode: 0100644,
+      name: name,
+      hash: undefined
+    });
   };
 
   Tree.prototype.createFolder = function () {
-    console.log("CreateFolder", this);
+    var name = prompt("Enter name for new folder");
+    if (!name) return;
+    this.addChild({
+      mode: 040000,
+      name: name,
+      hash: undefined
+    });
   };
 
   Tree.prototype.isDirty = function () {
+    if (!this.hash) return true;
     if (this.value === null || this.children === null) return false;
     var length = this.value.length;
     if (this.children.length !== length) return true;
@@ -363,7 +387,7 @@ function TreeView(editor, git) {
 
 
   File.prototype.isDirty = function () {
-    return this.doc && this.value !== null && this.value !== this.doc.getValue();
+    return !this.hash || this.doc && this.value !== null && this.value !== this.doc.getValue();
   };
 
   File.prototype.save = function (callback) {
@@ -417,7 +441,7 @@ function TreeView(editor, git) {
 
   Tree.prototype.onContextMenu = function (evt) {
     var items = [];
-    if (this.hasDirtyChildren()) items.push({icon: "asterisk", label: "Stage all Changes", action: "stageChanges"});
+    if (this.isDirty() || this.hasDirtyChildren()) items.push({icon: "asterisk", label: "Stage all Changes", action: "stageChanges"});
     if (this.hash !== commitTree[this.path]) {
       items.push({icon: "plus-squared", label: "Commit Staged Changes", action: "createCommit"});
     }
@@ -485,17 +509,10 @@ function TreeView(editor, git) {
     }
   }, false);
 
-  this.stageChanges = stageChanges;
-  function stageChanges() {
+  this.stageChanges = function () {
     if (!selected) return;
-    var root = selected.parent;
-    while (root.parent) root = root.parent;
-    root.save(function () {
-      root.repo.createRef("refs/tags/current", root.hash, function (err) {
-        if (err) return root.onError(err);
-      });
-    });
-  }
+    selected.stageChanges();
+  };
 
   function createRepo() {
     var name = prompt("Enter name for new repo");
