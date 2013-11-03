@@ -1,4 +1,18 @@
-var gitProject = require('./gitfs.js');
+var platform = {
+  sha1: require('git-sha1'),
+  bops: require('bops-browser'),
+  trace: function (name, stream, message) {
+    if (stream) return stream;
+    console.log(name, message);
+  }
+};
+
+var git = {
+  repo: require('js-git')(platform),
+  remote: require('git-net')(platform),
+  db: require('git-indexeddb')(platform)
+};
+
 var SplitView = require('./SplitView.js');
 var Editor = require('./Editor.js');
 var TreeView = require('./TreeView.js');
@@ -13,16 +27,10 @@ body = new SplitView({
     "Ctrl-Enter": require('./run.js'),
     "Ctrl-S": function () { tree.stageChanges(); },
   }),
-  side: tree = new TreeView(editor),
+  side: tree = new TreeView(editor, git),
 });
 window.addEventListener('resize', onResize, true);
 onResize();
-
-gitProject("test", function (err, fs, repo, db) {
-  if (err) return console.log(err);
-  repo.name = "test";
-  tree.addRepo(repo);
-});
 
 var width, height;
 function onResize() {

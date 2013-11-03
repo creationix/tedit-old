@@ -18,25 +18,11 @@ If you close a directory with dirty contents, it stages everything
 dirty and then discards the non-folders and closed folders inside.
 */
 
-
-
-function TreeView(editor) {
+function TreeView(editor, git) {
 
   // selected is a reference to the currently selected node
   // commitTree is a lookup of commit tree hashes for detecting staged changes.
   var selected, commitTree;
-
-  this.stageChanges = stageChanges;
-  function stageChanges() {
-    if (!selected) return;
-    var root = selected.parent;
-    while (root.parent) root = root.parent;
-    root.save(function () {
-      root.repo.createRef("refs/tags/current", root.hash, function (err) {
-        if (err) return root.onError(err);
-      });
-    });
-  }
 
   // The transient global scratchpad.
   var scratchpad;
@@ -395,7 +381,7 @@ function TreeView(editor) {
 
   this.onContextMenu = function (evt) {
     var items = [];
-    items.push({icon: "box", label: "Create new local repository"});
+    items.push({icon: "box", label: "Create new local repository", action: createRepo});
     items.push({sep:true});
     items.push({icon: "github", label: "Clone from GitHub"});
     items.push({icon: "bitbucket", label: "Clone from BitBucket"});
@@ -419,17 +405,40 @@ function TreeView(editor) {
     }
   }, false);
 
-  this.addRepo = function (repo) {
-    var ul = this.ul;
+  this.stageChanges = stageChanges;
+  function stageChanges() {
+    if (!selected) return;
+    var root = selected.parent;
+    while (root.parent) root = root.parent;
+    root.save(function () {
+      root.repo.createRef("refs/tags/current", root.hash, function (err) {
+        if (err) return root.onError(err);
+      });
+    });
+  }
+
+  function createRepo() {
+    var name = prompt("Enter name for new repo");
+    var db = git.db(name);
+    db.init(function (err) {
+      if (err) throw err;
+      var repo = git.repo(db);
+      repo.name = name;
+      addRepo(repo);
+    });
+  }
+
+
+  function addRepo(repo) {
     getRoot(repo, function (err, hash, hashes) {
       if (err) throw err;
       commitTree = hashes;
       var root = new Tree(repo, 040000, repo.name, hash, null);
-      ul.appendChild(root.el);
+      self.ul.appendChild(root.el);
       // Auto-open tree
       root.onClick();
     });
-  };
+  }
 }
 
 TreeView.prototype.resize = function (width, height) {
@@ -497,7 +506,9 @@ function getRoot(repo, callback) {
     return repo.readRef("refs/tags/current", function (err, current) {
       if (err) return callback(err);
       current = current || head && head.tree;
-      if (!current) return callback(new Error("No root at all"));
+      if (!current) return repo.saveAs("tree", [], function (err, current) {
+        return callback(null, current, commitTree);
+      });
       if (!head) return callback(null, current, commitTree);
       return walk("", head.tree, function (err) {
         if (err) return callback(err);

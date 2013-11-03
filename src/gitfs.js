@@ -1,14 +1,3 @@
-var platform = {
-  sha1: require('git-sha1'),
-  bops: require('bops-browser'),
-  trace: function (name, stream, message) {
-    if (stream) return stream;
-    console.log(name, message);
-  }
-};
-
-var jsGit = require('js-git')(platform);
-var localDb = require('git-indexeddb')(platform);
 var newFileSystem = require('./fs.js');
 
 module.exports = function (name, callback) {
