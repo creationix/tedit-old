@@ -170,6 +170,9 @@ function TreeView(editor, git) {
         classes.push("icon-doc");
       }
     }
+    else if (this.mode === 0120000) {
+      classes.push("icon-link");
+    }
     else {
       console.error("Invalid mode", this);
     }
@@ -343,6 +346,7 @@ function TreeView(editor, git) {
     var Constructor;
     if (entry.mode === 040000) Constructor = Tree;
     else if (entry.mode === 0100644 || entry.mode === 0100755) Constructor = File;
+    else if (entry.mode === 0120000) Constructor = SymLink;
     else throw "TODO: Implement more mode types";
     return new Constructor(this.repo, entry.mode, entry.name, entry.hash, this);
   };
@@ -383,6 +387,17 @@ function TreeView(editor, git) {
     });
   };
 
+  Tree.prototype.createSymLink = function () {
+    var name = prompt("Enter name for the new symlink");
+    if (!name) return;
+
+    this.addChild({
+      mode: 0120000,
+      name: name,
+      hash: undefined
+    });
+  };
+
   Tree.prototype.isDirty = function () {
     if (!this.hash) return true;
     if (this.value === null || this.children === null) return false;
@@ -410,7 +425,7 @@ function TreeView(editor, git) {
     if (this.children) {
       items.push({icon: "doc-text", label: "Create File", action: "createFile"});
       items.push({icon: "folder", label: "Create Folder", action: "createFolder"});
-      items.push({icon: "link", label: "Create SymLink"});
+      items.push({icon: "link", label: "Create SymLink", action: "createSymLink"});
     }
     if (this.parent) {
       items.push({icon: "edit", label: "Rename Folder", action: "renameSelf"});
@@ -514,6 +529,20 @@ function TreeView(editor, git) {
       items.push({icon: "trash", label: "Delete File", action: "removeSelf"});
     }
     new ContextMenu(this, evt, items);
+  };
+
+  function SymLink(repo, mode, name, hash, parent) {
+    Node.call(this, repo, mode, name, hash, parent);
+  }
+  SymLink.prototype = Object.create(Node.prototype, {
+    constructor: { value: SymLink }
+  });
+
+  SymLink.prototype.isDirty = function () {
+    return true;
+  };
+
+  SymLink.prototype.onClick = function () {
   };
 
 
