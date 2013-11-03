@@ -25,6 +25,13 @@ function TreeView(editor, git) {
   var selected, commitTree;
   var username, email;
 
+  function deselect() {
+    var old = selected;
+    old.onChange();
+    editor.swap(scratchpad);
+    selected = null;
+  }
+
   // The transient global scratchpad.
   var scratchpad;
 
@@ -86,7 +93,6 @@ function TreeView(editor, git) {
       }
     }
   }
-
 
   function Node(repo, mode, name, hash, parent) {
     this.repo = repo;
@@ -221,6 +227,16 @@ function TreeView(editor, git) {
     this.onChange();
   }
 
+  Node.prototype.renameSelf = function () {
+    console.log("TODO: rename self", this);
+  };
+
+  Node.prototype.removeSelf = function () {
+    if (selected === this) deselect();
+    else if (selected && this.children) this.clearChildren();
+    this.parent.removeChild(this);
+  };
+
   function Tree(repo, mode, name, hash, parent) {
     Node.call(this, repo, mode, name, hash, parent);
     // The sub list for children
@@ -278,6 +294,17 @@ function TreeView(editor, git) {
     }
   }
 
+  Tree.prototype.clearChildren = function () {
+    var parent = selected && selected.parent;
+    while (parent) {
+      if (parent === this) {
+        deselect();
+        break;
+      }
+      parent = parent.parent;
+    }
+  };
+
   Tree.prototype.onClick = function () {
     if (this.value === null) return this.load("tree");
 
@@ -287,17 +314,7 @@ function TreeView(editor, git) {
       if (this.isDirty() || this.children && this.hasDirtyChildren()) return;
 
       // If selected is a deselect it.
-      var parent = selected && selected.parent;
-      while (parent) {
-        if (parent === this) {
-          var old = selected;
-          old.onChange();
-          editor.swap(scratchpad);
-          selected = null;
-          break;
-        }
-        parent = parent.parent;
-      }
+      this.clearChildren();
 
       // TODO walk children saving any outstanding changes.
       // First remove all children of the ul.
@@ -338,6 +355,14 @@ function TreeView(editor, git) {
     child.onClick();
   };
 
+  Tree.prototype.removeChild = function (child) {
+    var index = this.children.indexOf(child);
+    if (index < 0) return;
+    this.children.splice(index, 1);
+    this.orderChildren();
+    this.onChange();
+  };
+
   Tree.prototype.createFile = function () {
     var name = prompt("Enter name for new file");
     if (!name) return;
@@ -375,6 +400,45 @@ function TreeView(editor, git) {
     return false;
   };
 
+  Tree.prototype.onContextMenu = function (evt) {
+    var items = [];
+    var dirty = this.isDirty() || this.hasDirtyChildren();
+    if (dirty) items.push({icon: "asterisk", label: "Stage all Changes", action: "stageChanges"});
+    if (this.hash !== commitTree[this.path]) {
+      items.push({icon: "plus-squared", label: "Commit Staged Changes", action: "createCommit"});
+    }
+    if (this.children) {
+      items.push({icon: "doc-text", label: "Create File", action: "createFile"});
+      items.push({icon: "folder", label: "Create Folder", action: "createFolder"});
+      items.push({icon: "link", label: "Create SymLink"});
+    }
+    if (this.parent) {
+      items.push({icon: "edit", label: "Rename Folder", action: "renameSelf"});
+    }
+    if (this.parent) {
+      if (!dirty) {
+        items.push({sep:true});
+        items.push({icon: "trash", label: "Delete Folder", action: "removeSelf"});
+      }
+    }
+    else {
+      items.push({sep:true});
+      if (this.remote) {
+        items.push({icon: "upload-cloud", label: "Push Changes to Remote"});
+        items.push({icon: "download-cloud", label: "Pull Changes from Remote"});
+      }
+      else {
+        items.push({icon: "upload-cloud", label: "Set remote url", action: "setRemote"});
+      }
+      items.push({icon: "th-list", label: "View Commit History"});
+      items.push({icon: "tags", label: "View Tags and Branches"});
+      items.push({sep:true});
+      items.push({icon: "trash", label: "Remove Repository"});
+    }
+    new ContextMenu(this, evt, items);
+  };
+
+
   function File(repo, mode, name, hash, parent) {
     Node.call(this, repo, mode, name, hash, parent);
     // Reference to the editor instance
@@ -383,8 +447,6 @@ function TreeView(editor, git) {
   File.prototype = Object.create(Node.prototype, {
     constructor: { value: File }
   });
-
-
 
   File.prototype.isDirty = function () {
     return !this.hash || this.doc && this.value !== null && this.value !== this.doc.getValue();
@@ -439,49 +501,21 @@ function TreeView(editor, git) {
     }
   };
 
-  Tree.prototype.onContextMenu = function (evt) {
+  File.prototype.onContextMenu = function (evt) {
     var items = [];
-    if (this.isDirty() || this.hasDirtyChildren()) items.push({icon: "asterisk", label: "Stage all Changes", action: "stageChanges"});
+    var dirty = this.isDirty();
+    if (dirty) items.push({icon: "asterisk", label: "Stage All Changes", action: "stageChanges"});
     if (this.hash !== commitTree[this.path]) {
       items.push({icon: "plus-squared", label: "Commit Staged Changes", action: "createCommit"});
     }
-    if (this.children) {
-      items.push({icon: "doc-text", label: "Create File", action: "createFile"});
-      items.push({icon: "folder", label: "Create Folder", action: "createFolder"});
-      items.push({icon: "link", label: "Create SymLink"});
-    }
-    items.push({icon: "edit", label: "Rename Folder"});
-    items.push({sep:true});
-    if (this.parent) {
-      items.push({icon: "trash", label: "Delete Folder"});
-    }
-    else {
-      if (this.remote) {
-        items.push({icon: "upload-cloud", label: "Push Changes to Remote"});
-        items.push({icon: "download-cloud", label: "Pull Changes from Remote"});
-      }
-      else {
-        items.push({icon: "upload-cloud", label: "Set remote url", action: "setRemote"});
-      }
-      items.push({icon: "th-list", label: "View Commit History"});
-      items.push({icon: "tags", label: "View Tags and Branches"});
+    items.push({icon: "edit", label: "Rename File", action: "renameSelf"});
+    if (!dirty) {
       items.push({sep:true});
-      items.push({icon: "trash", label: "Remove Repository"});
+      items.push({icon: "trash", label: "Delete File", action: "removeSelf"});
     }
     new ContextMenu(this, evt, items);
   };
 
-  File.prototype.onContextMenu = function (evt) {
-    var items = [];
-    if (this.isDirty()) items.push({icon: "asterisk", label: "Stage All Changes", action: "stageChanges"});
-    if (this.hash !== commitTree[this.path]) {
-      items.push({icon: "plus-squared", label: "Commit Staged Changes", action: "createCommit"});
-    }
-    items.push({icon: "edit", label: "Rename File"});
-    items.push({sep:true});
-    items.push({icon: "trash", label: "Delete File"});
-    new ContextMenu(this, evt, items);
-  };
 
   this.onContextMenu = function (evt) {
     var items = [];
@@ -509,6 +543,7 @@ function TreeView(editor, git) {
     }
   }, false);
 
+  // Hook for Control-S shortcut in editor.
   this.stageChanges = function () {
     if (!selected) return;
     selected.stageChanges();
@@ -543,10 +578,11 @@ TreeView.prototype.resize = function (width, height) {
   this.el.style.height = height + "px";
 };
 
-
 // Quick sort function that puts folders first by abusing their low mode value.
 function folderFirst(a, b) {
-  return a.mode - b.mode;
+  if (a.mode !== b.mode) return a.mode - b.mode;
+  // Fallback to sorted by name.
+  return byName(a, b);
 }
 
 // Sort using the same algorithm git uses internally to build trees
