@@ -120,6 +120,11 @@ function TreeView(editor, git) {
 
   Node.prototype.load = function (type) {
     var self = this;
+    if (!this.hash) {
+      if (type === "tree") this.value = [];
+      else this.value = "";
+      return this.onClick();
+    }
     return this.repo.loadAs(type, this.hash, function (err, value) {
       if (err) return self.onError(err);
       self.value = value;
@@ -167,14 +172,20 @@ function TreeView(editor, git) {
   };
 
   Node.prototype.createCommit = function () {
+
+    // Get information from the user.
+    username = username || prompt("Enter your name");
+    if (!username) return;
+    email = email || prompt("Enter your email");
+    if (!email) return;
+    var message = prompt("Enter commit message");
+    if (!message) return;
+
     // Find the root tree
     var root = this;
     while (root.parent) root = root.parent;
     var repo = this.repo;
 
-    username = username || prompt("Enter your name");
-    email = email || prompt("Enter your email");
-    var message = prompt("Enter commit message");
 
     repo.loadAs("commit", "HEAD", function (err, head, hash) {
       if (err) throw err;
@@ -194,6 +205,7 @@ function TreeView(editor, git) {
 
   Node.prototype.setRemote = function () {
     var url = prompt("Enter remote git url");
+    if (!url) return;
     this.remote = git.remote(url);
     this.onChange();
   }
@@ -256,7 +268,7 @@ function TreeView(editor, git) {
   }
 
   Tree.prototype.onClick = function () {
-    if (!this.value) return this.load("tree");
+    if (this.value === null) return this.load("tree");
 
     // If we're already open, we need to close the folder
     if (this.children) {
@@ -286,16 +298,41 @@ function TreeView(editor, git) {
     var self = this;
     // Create UI instances for the children.
     this.children = this.value.map(function (entry) {
-      var Constructor;
-      if (entry.mode === 040000) Constructor = Tree;
-      else if (entry.mode === 0100644 || entry.mode === 0100755) Constructor = File;
-      else throw "TODO: Implement more mode types";
-      return new Constructor(self.repo, entry.mode, entry.name, entry.hash, self);
+      return self.childFromEntry(entry);
     });
     // Put folders first.
-    this.children.sort(folderFirst);
-    this.ul.appendChild(domBuilder(this.children.map(getEl)));
+    this.orderChildren();
     this.onChange();
+  };
+
+  Tree.prototype.orderChildren = function () {
+    this.children.sort(folderFirst);
+    this.ul.textContent = "";
+    this.ul.appendChild(domBuilder(this.children.map(getEl)));
+  };
+
+  Tree.prototype.childFromEntry = function (entry) {
+    var Constructor;
+    if (entry.mode === 040000) Constructor = Tree;
+    else if (entry.mode === 0100644 || entry.mode === 0100755) Constructor = File;
+    else throw "TODO: Implement more mode types";
+    return new Constructor(this.repo, entry.mode, entry.name, entry.hash, this);
+  };
+
+  Tree.prototype.createFile = function () {
+    var name = prompt("Enter new filename");
+    if (!name) return;
+    this.children.push(this.childFromEntry({
+      mode: 0100644,
+      name: name,
+      hash: null
+    }));
+    this.orderChildren();
+    this.onChange();
+  };
+
+  Tree.prototype.createFolder = function () {
+    console.log("CreateFolder", this);
   };
 
   Tree.prototype.isDirty = function () {
@@ -323,6 +360,8 @@ function TreeView(editor, git) {
     constructor: { value: File }
   });
 
+
+
   File.prototype.isDirty = function () {
     return this.doc && this.value !== null && this.value !== this.doc.getValue();
   };
@@ -341,7 +380,7 @@ function TreeView(editor, git) {
   };
 
   File.prototype.onClick = function () {
-    if (!this.value) return this.load("text");
+    if (this.value === null) return this.load("text");
 
     if (!this.doc) {
       var mime = getMime(this.name);
@@ -382,9 +421,11 @@ function TreeView(editor, git) {
     if (this.hash !== commitTree[this.path]) {
       items.push({icon: "plus-squared", label: "Commit Staged Changes", action: "createCommit"});
     }
-    items.push({icon: "doc-text", label: "Create File"});
-    items.push({icon: "folder", label: "Create Folder"});
-    items.push({icon: "link", label: "Create SymLink"});
+    if (this.children) {
+      items.push({icon: "doc-text", label: "Create File", action: "createFile"});
+      items.push({icon: "folder", label: "Create Folder", action: "createFolder"});
+      items.push({icon: "link", label: "Create SymLink"});
+    }
     items.push({icon: "edit", label: "Rename Folder"});
     items.push({sep:true});
     if (this.parent) {
@@ -458,6 +499,7 @@ function TreeView(editor, git) {
 
   function createRepo() {
     var name = prompt("Enter name for new repo");
+    if (!name) return;
     var db = git.db(name);
     db.init(function (err) {
       if (err) throw err;
