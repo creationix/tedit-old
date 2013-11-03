@@ -7,6 +7,7 @@ T("build", T.parallel(
   T.copy("src/icon-128.png", "app/icon-128.png"),
   T.copy("src/background.js", "app/background.js"),
   T.copy("src/index.html", "app/index.html"),
+  T.copy("src/server.js", "app/server.js"),
   T.newer("src", /\.(?:less|css)$/, "app/style.css",
     T.lessc("src/style.less", "app/style.css")
   ),

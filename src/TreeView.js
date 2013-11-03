@@ -23,6 +23,7 @@ function TreeView(editor, git) {
   // selected is a reference to the currently selected node
   // commitTree is a lookup of commit tree hashes for detecting staged changes.
   var selected, commitTree;
+  var username, email;
 
   // The transient global scratchpad.
   var scratchpad;
@@ -54,7 +55,10 @@ function TreeView(editor, git) {
         var attrs = {};
         if (item.action) {
           attrs.onclick = function (evt) {
-            item.action();
+            if (typeof item.action === "string") {
+              item.action = node[item.action];
+            }
+            item.action.call(node);
             closeMenu(evt);
           };
         }
@@ -161,6 +165,38 @@ function TreeView(editor, git) {
     this.iconEl.setAttribute('class', classes.join(" "));
     this.nameEl.textContent = this.name;
   };
+
+  Node.prototype.createCommit = function () {
+    // Find the root tree
+    var root = this;
+    while (root.parent) root = root.parent;
+    var repo = this.repo;
+
+    username = username || prompt("Enter your name");
+    email = email || prompt("Enter your email");
+    var message = prompt("Enter commit message");
+
+    repo.loadAs("commit", "HEAD", function (err, head, hash) {
+      if (err) throw err;
+      repo.saveAs("commit", {
+        tree: root.hash,
+        parent: hash,
+        author: { name: username, email: email },
+        message: message
+      }, function (err, hash) {
+        if (err) throw err;
+        repo.updateHead(hash, function (err) {
+          if (err) throw err;
+        });
+      });
+    });
+  };
+
+  Node.prototype.setRemote = function () {
+    var url = prompt("Enter remote git url");
+    this.remote = git.remote(url);
+    this.onChange();
+  }
 
   function Tree(repo, mode, name, hash, parent) {
     Node.call(this, repo, mode, name, hash, parent);
@@ -342,9 +378,9 @@ function TreeView(editor, git) {
 
   Tree.prototype.onContextMenu = function (evt) {
     var items = [];
-    if (this.hasDirtyChildren()) items.push({icon: "asterisk", label: "Stage all Changes", action: stageChanges});
+    if (this.hasDirtyChildren()) items.push({icon: "asterisk", label: "Stage all Changes", action: "stageChanges"});
     if (this.hash !== commitTree[this.path]) {
-      items.push({icon: "plus-squared", label: "Commit Staged Changes"});
+      items.push({icon: "plus-squared", label: "Commit Staged Changes", action: "createCommit"});
     }
     items.push({icon: "doc-text", label: "Create File"});
     items.push({icon: "folder", label: "Create Folder"});
@@ -359,6 +395,9 @@ function TreeView(editor, git) {
         items.push({icon: "upload-cloud", label: "Push Changes to Remote"});
         items.push({icon: "download-cloud", label: "Pull Changes from Remote"});
       }
+      else {
+        items.push({icon: "upload-cloud", label: "Set remote url", action: "setRemote"});
+      }
       items.push({icon: "th-list", label: "View Commit History"});
       items.push({icon: "tags", label: "View Tags and Branches"});
       items.push({sep:true});
@@ -369,9 +408,9 @@ function TreeView(editor, git) {
 
   File.prototype.onContextMenu = function (evt) {
     var items = [];
-    if (this.isDirty()) items.push({icon: "asterisk", label: "Stage All Changes", action: stageChanges});
+    if (this.isDirty()) items.push({icon: "asterisk", label: "Stage All Changes", action: "stageChanges"});
     if (this.hash !== commitTree[this.path]) {
-      items.push({icon: "plus-squared", label: "Commit Staged Changes"});
+      items.push({icon: "plus-squared", label: "Commit Staged Changes", action: "createCommit"});
     }
     items.push({icon: "edit", label: "Rename File"});
     items.push({sep:true});
@@ -427,7 +466,6 @@ function TreeView(editor, git) {
       addRepo(repo);
     });
   }
-
 
   function addRepo(repo) {
     getRoot(repo, function (err, hash, hashes) {
@@ -498,25 +536,12 @@ function onClick(node) {
   };
 }
 
-function getRoot(repo, callback) {
-  // path-to-hash lookup for the latest commit.
+function walkCommitTree(repo, root, callback) {
   var commitTree = {};
-  return repo.loadAs("commit", "HEAD", function (err, head) {
+  return walk("", root, function (err) {
     if (err) return callback(err);
-    return repo.readRef("refs/tags/current", function (err, current) {
-      if (err) return callback(err);
-      current = current || head && head.tree;
-      if (!current) return repo.saveAs("tree", [], function (err, current) {
-        return callback(null, current, commitTree);
-      });
-      if (!head) return callback(null, current, commitTree);
-      return walk("", head.tree, function (err) {
-        if (err) return callback(err);
-        return callback(null, current, commitTree);
-      });
-    });
+    return callback(null, commitTree);
   });
-
 
   function walk(path, hash, callback) {
     var done = false, left = 1;
@@ -544,4 +569,27 @@ function getRoot(repo, callback) {
     }
   }
 
+
+}
+
+function getRoot(repo, callback) {
+  // path-to-hash lookup for the latest commit.
+  return repo.loadAs("commit", "HEAD", function (err, head) {
+    if (err) return callback(err);
+    return repo.readRef("refs/tags/current", function (err, current) {
+      if (err) return callback(err);
+      current = current || head && head.tree;
+      if (!current) return repo.saveAs("tree", [], function (err, current) {
+        repo.createRef("refs/tags/current", current, function (err) {
+          if (err) return callback(err);
+          return callback(null, current, {});
+        });
+      });
+      if (!head) return callback(null, current, {});
+      walkCommitTree(repo, head.tree, function (err, commitTree) {
+        if (err) return callback(err);
+        return callback(null, current, commitTree);
+      });
+    });
+  });
 }

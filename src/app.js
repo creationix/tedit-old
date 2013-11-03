@@ -1,6 +1,8 @@
 var platform = {
   sha1: require('git-sha1'),
   bops: require('bops-browser'),
+  tcp: require('websocket-tcp-client').tcp,
+  tls: require('websocket-tcp-client').tls,
   trace: function (name, stream, message) {
     if (stream) return stream;
     console.log(name, message);
