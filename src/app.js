@@ -18,18 +18,24 @@ var git = {
 var SplitView = require('./SplitView.js');
 var Editor = require('./Editor.js');
 var TreeView = require('./TreeView.js');
+var LogView = require('./LogView.js');
 
 var body, tree, editor;
 
 body = new SplitView({
   el: document.body,
-  orientation: "left",
-  size: Math.min(200, window.innerWidth >> 1),
-  main: editor = new Editor({
-    "Ctrl-Enter": require('./run.js'),
-    "Ctrl-S": function () { tree.stageChanges(); },
+  orientation: "bottom",
+  size: Math.min(200, window.innerHeight >> 1),
+  main: new SplitView({
+    orientation: "left",
+    size: Math.min(200, window.innerWidth >> 1),
+    main: editor = new Editor({
+      "Ctrl-Enter": require('./run.js'),
+      "Ctrl-S": function () { tree.stageChanges(); },
+    }),
+    side: tree = new TreeView(editor, git)
   }),
-  side: tree = new TreeView(editor, git),
+  side: new LogView()
 });
 window.addEventListener('resize', onResize, true);
 onResize();
