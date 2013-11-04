@@ -151,7 +151,7 @@ function TreeView(editor, git) {
     if (this.mode === 040000) {
       // Root tree gets a box icon since it represents the repo.
       if (!this.parent) {
-        var url = this.remote && this.remote.href;
+        var url = this.repo.remote && this.repo.remote.href;
         if (/\bgithub\b/.test(url)) classes.push("icon-github");
         else if (/\bbitbucket\b/.test(url)) classes.push("icon-bitbucket");
         else classes.push("icon-box");
@@ -452,7 +452,7 @@ function TreeView(editor, git) {
     }
     else {
       items.push({sep:true});
-      if (this.remote) {
+      if (this.repo.remote) {
         items.push({icon: "upload-cloud", label: "Push Changes to Remote"});
         items.push({icon: "download-cloud", label: "Pull Changes from Remote"});
       }
@@ -468,9 +468,9 @@ function TreeView(editor, git) {
   };
 
   Tree.prototype.setRemote = function () {
-    var url = prompt("Enter remote git url", this.remote && this.remote.href);
+    var url = prompt("Enter remote git url", this.repo.remote && this.repo.remote.href);
     if (!url) return;
-    this.remote = git.remote(url);
+    this.repo.remote = git.remote(url);
     this.onChange();
   };
 
@@ -544,9 +544,16 @@ function TreeView(editor, git) {
       items.push({icon: "plus-squared", label: "Commit Staged Changes", action: "createCommit"});
     }
     items.push({icon: "edit", label: "Rename File", action: "renameSelf"});
+    items.push({icon: "asterisk", label: "Toggle Executable", action: "toggleExec"});
     items.push({sep:true});
     items.push({icon: "trash", label: "Delete File", action: "removeSelf"});
     new ContextMenu(this, evt, items);
+  };
+
+  File.prototype.toggleExec = function () {
+    this.mode = this.mode === 0100755 ? 0100644 : 0100755;
+    this.onChange();
+    this.parent.onChange();
   };
 
   function SymLink(repo, mode, name, hash, parent) {
@@ -604,10 +611,7 @@ function TreeView(editor, git) {
   this.onContextMenu = function (evt) {
     var items = [];
     items.push({icon: "box", label: "Create new local repository", action: createRepo});
-    items.push({sep:true});
-    items.push({icon: "github", label: "Clone from GitHub"});
-    items.push({icon: "bitbucket", label: "Clone from BitBucket"});
-    items.push({icon: "box", label: "Clone from custom URL"});
+    items.push({icon: "box", label: "Clone from remote Repository", action: cloneRepo});
     new ContextMenu(null, evt, items);
   };
 
@@ -642,6 +646,27 @@ function TreeView(editor, git) {
       var repo = git.repo(db);
       repo.name = name;
       addRepo(repo);
+    });
+  }
+
+  function cloneRepo() {
+    var url = prompt("Enter git url to clone");
+    if (!url) return;
+    var remote;
+    remote = git.remote(url);
+    var name = prompt("Enter local name", remote.pathname.replace(/\.git$/, '').replace(/^\//, ''));
+    if (!name) return;
+    var db = git.db(name);
+    db.init(function (err) {
+      if (err) throw err;
+      var repo = git.repo(db);
+      console.log("Cloning " + remote.href + " to " + name + "...");
+      repo.fetch(remote, {}, function (err) {
+        if (err) throw err;
+        repo.name = name;
+        repo.remote = remote;
+        addRepo(repo);
+      });
     });
   }
 
@@ -758,12 +783,14 @@ function getRoot(repo, callback) {
     return repo.readRef("refs/tags/current", function (err, current) {
       if (err) return callback(err);
       current = current || head && head.tree;
-      if (!current) return repo.saveAs("tree", [], function (err, current) {
-        repo.createRef("refs/tags/current", current, function (err) {
-          if (err) return callback(err);
-          return callback(null, current, {});
+      if (!current) {
+        return repo.saveAs("tree", [], function (err, current) {
+          repo.createRef("refs/tags/current", current, function (err) {
+            if (err) return callback(err);
+            return callback(null, current, {});
+          });
         });
-      });
+      }
       if (!head) return callback(null, current, {});
       walkCommitTree(repo, head.tree, function (err, commitTree) {
         if (err) return callback(err);
