@@ -94,6 +94,15 @@ ul.contextMenu {
   li {
     white-space: nowrap;
   }
+  span.target {
+    margin-left: 0.2em;
+    font-style: italic;
+    color: #BA4583;
+    &:before {
+      color: #63364E;
+      content: '\2192 ';  /* '→ ' */
+    }
+  }
   .row {
     margin-left: -10em;
     padding-left: 10em;

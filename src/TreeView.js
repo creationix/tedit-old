@@ -147,6 +147,7 @@ function TreeView(editor, git) {
     this.rowEl.setAttribute('class', classes.join(" "));
     this.rowEl.setAttribute('title', this.hash);
     classes.length = 0;
+    this.nameEl.textContent = this.name;
     if (this.mode === 040000) {
       // Root tree gets a box icon since it represents the repo.
       if (!this.parent) classes.push("icon-box");
@@ -172,12 +173,12 @@ function TreeView(editor, git) {
     }
     else if (this.mode === 0120000) {
       classes.push("icon-link");
+      this.nameEl.appendChild(domBuilder(["span.target", this.target]));
     }
     else {
       console.error("Invalid mode", this);
     }
     this.iconEl.setAttribute('class', classes.join(" "));
-    this.nameEl.textContent = this.name;
   };
 
   Node.prototype.stageChanges = function () {
@@ -351,8 +352,7 @@ function TreeView(editor, git) {
     return new Constructor(this.repo, entry.mode, entry.name, entry.hash, this);
   };
 
-  Tree.prototype.addChild = function (entry) {
-    var child = this.childFromEntry(entry);
+  Tree.prototype.addChild = function (child) {
     this.children.push(child);
     this.orderChildren();
     this.onChange();
@@ -370,32 +370,35 @@ function TreeView(editor, git) {
   Tree.prototype.createFile = function () {
     var name = prompt("Enter name for new file");
     if (!name) return;
-    this.addChild({
+    var child = this.childFromEntry({
       mode: 0100644,
       name: name,
       hash: undefined
     });
+    this.addChild(child);
   };
 
   Tree.prototype.createFolder = function () {
     var name = prompt("Enter name for new folder");
     if (!name) return;
-    this.addChild({
+    var child = this.childFromEntry({
       mode: 040000,
       name: name,
       hash: undefined
     });
+    this.addChild(child);
   };
 
   Tree.prototype.createSymLink = function () {
     var name = prompt("Enter name for the new symlink");
     if (!name) return;
 
-    this.addChild({
+    var child = this.childFromEntry({
       mode: 0120000,
       name: name,
       hash: undefined
     });
+    this.addChild(child);
   };
 
   Tree.prototype.isDirty = function () {
@@ -539,10 +542,15 @@ function TreeView(editor, git) {
   });
 
   SymLink.prototype.isDirty = function () {
-    return true;
+    if (!this.hash) return true;
+    return this.value !== this.target;
   };
 
   SymLink.prototype.onClick = function () {
+    var target = prompt("Update symlink target", this.target);
+    if (!target) return;
+    this.target = target;
+    this.onChange();
   };
 
 
