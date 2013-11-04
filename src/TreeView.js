@@ -263,9 +263,7 @@ function TreeView(editor, git) {
     return false;
   };
 
-  Tree.prototype.save = TreeSave;
-  function TreeSave(callback) {
-    if (!callback) return TreeSave.bind(this);
+  Tree.prototype.save = function (callback) {
     var self = this;
     // No children means nothing to save.
     if (!this.children) return callback();
@@ -536,6 +534,12 @@ function TreeView(editor, git) {
 
   function SymLink(repo, mode, name, hash, parent) {
     Node.call(this, repo, mode, name, hash, parent);
+    var self = this;
+    if (hash) repo.loadAs("text", hash, function (err, target) {
+      if (err) return self.onError(err);
+      self.value = self.target = target;
+      self.onChange();
+    });
   }
   SymLink.prototype = Object.create(Node.prototype, {
     constructor: { value: SymLink }
