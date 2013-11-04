@@ -9,15 +9,22 @@ module.exports = Editor;
 
 function Editor(extraKeys) {
   domBuilder(["$el",
+    [".fill$cmEl"],
+    [".fill.preview$imageEl", {
+      css: { display: "none" },
+      onclick: this.toggleTile.bind(this)
+    }, [".fill$previewEl"]]
   ], this);
-  var cm = this.cm = CodeMirror(this.el, {
-    value: "",
+  this.cm = CodeMirror(this.cmEl, {
+    value: require('./welcome.js#txt'),
     mode: "javascript",
     theme: "ambiance",
     // lineNumbers: true,
     extraKeys: extraKeys
   });
   this.entry = {};
+  // The transient global scratchpad.
+  this.scratchpad = this.cm.getDoc();
 }
 Editor.prototype.resize = function (width, height) {
   this.el.style.width = width + "px";
@@ -27,10 +34,36 @@ Editor.prototype.resize = function (width, height) {
 };
 
 Editor.prototype.swap = function (doc) {
-  var old = this.cm.swapDoc(doc);
-  this.cm.focus();
-  return old;
+  if (doc === undefined) {
+    doc = this.scratchpad;
+  }
+  if (doc instanceof CodeMirror.Doc) {
+    this.cm.swapDoc(doc);
+    this.cm.focus();
+    this.cmEl.style.display = "block";
+    if (this.imageDoc) {
+      this.imageDoc = null;
+      this.previewEl.style.backgroundImage = "";
+      this.imageEl.style.display = "none";
+    }
+  }
+  else {
+    if (!this.imageDoc) {
+      this.cmEl.style.display = "none";
+      this.imageEl.style.display = "block";
+    }
+    this.imageDoc = doc;
+    this.previewEl.style.backgroundImage = "url(" + doc.url + ")";
+    if (doc.tiled) this.previewEl.classList.remove("zoom");
+    else this.previewEl.classList.add("zoom");
+  }
 };
+
+Editor.prototype.toggleTile = function () {
+  var tiled = this.imageDoc.tiled = !this.imageDoc.tiled;
+  if (tiled) this.previewEl.classList.remove("zoom");
+  else this.previewEl.classList.add("zoom");
+}
 
 Editor.prototype.newDoc = function (file) {
   var mime = getMime(file.name);
@@ -45,33 +78,15 @@ Editor.prototype.newDoc = function (file) {
     return doc;
   }
   if (/^image\//.test(mime)) {
-    console.log("SHOW IMAGE", mime, file.value);
-    return;
+    var blob = new Blob([file.value], {type: mime});
+    var value = file.value;
+    return {
+      getValue: function () { return value; },
+      url: URL.createObjectURL(blob),
+      tile: false
+    };
   }
   console.log("Unknown type " + mime);
-};
-
-Editor.prototype.showImage = function (file, mime) {
-  var $ = {};
-  var self = this;
-  file.repo.loadAs("blob", file.hash, function (err, binary) {
-    if (err) return file.onError(err);
-    var blob = new Blob([binary], {type: mime});
-    var url = URL.createObjectURL(blob);
-    self.el.appendChild(domBuilder([
-      [".shield.dark$shield", {onclick: closePreview}],
-      [".preview$preview",
-        ["img", {src: url}]
-      ]
-    ], $));
-
-  });
-  function closePreview(evt) {
-    evt.preventDefault();
-    evt.stopPropagation();
-    self.el.removeChild($.shield);
-    self.el.removeChild($.preview);
-  }
 };
 
 

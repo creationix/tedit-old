@@ -29,12 +29,10 @@ function TreeView(editor, git) {
   function deselect() {
     var old = selected;
     old.onChange();
-    editor.swap(scratchpad);
+    editor.swap();
     selected = null;
   }
 
-  // The transient global scratchpad.
-  var scratchpad;
 
   function ContextMenu(node, evt, items) {
     if (node) {
@@ -512,7 +510,7 @@ function TreeView(editor, git) {
       // Deselect a file reverting to the scratchpad
       selected = null;
       this.onChange();
-      editor.swap(scratchpad);
+      editor.swap();
     }
     else if (selected) {
       // Move selection to a new file
@@ -526,7 +524,7 @@ function TreeView(editor, git) {
       // Stash scratchpad and select a file
       selected = this;
       this.onChange();
-      scratchpad = editor.swap(this.doc);
+      editor.swap(this.doc);
     }
   };
 

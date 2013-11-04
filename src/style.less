@@ -75,6 +75,25 @@ ul.contextMenu {
     }
   }
 }
+.fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 100%;
+}
+.preview {
+  background-color: #cf6969;
+  background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH3QsEFCs5qJx92gAAAB1pVFh0Q29tbWVudAAAAAAAQ3JlYXRlZCB3aXRoIEdJTVBkLmUHAAAAK0lEQVQ4y2M0MjL6z4AHGBsb45NmYGKgEIwaMBgMYCEUz2fPnh0NxOFvAADQeAVQbGocpgAAAABJRU5ErkJggg==');
+  div {
+    background-position: center;
+    &.zoom {
+      background-repeat: no-repeat;
+      background-size: contain;
+    }
+  }
+}
 .tree {
   -webkit-user-select: none;
   user-select: none;
