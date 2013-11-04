@@ -490,8 +490,10 @@ function TreeView(editor, git) {
   File.prototype.save = function (callback) {
     if (!this.isDirty()) return callback();
     var self = this;
+    // UTF-8 Encode the value
     var value = this.doc.getValue();
-    this.repo.saveAs("blob", value, function (err, hash) {
+    var encoded = unescape(encodeURIComponent(value));
+    this.repo.saveAs("blob", encoded, function (err, hash) {
       if (err) return self.onError(err);
       self.value = value;
       self.hash = hash;
@@ -502,15 +504,16 @@ function TreeView(editor, git) {
 
   File.prototype.onClick = function () {
     if (this.value === null) return this.load("text");
+    var mime = getMime(this.name, this.value);
 
     if (!this.doc) {
-      var mime = getMime(this.name);
       if (!/(?:\/json$|^text\/)/.test(mime)) {
         // TODO: open non code files
         return;
       }
-      // TODO: UTF-8 decode contents.
-      this.doc = editor.newDoc(this.value, mime);
+      // UTF-8 Decode the string
+      var text = this.value = decodeURIComponent(escape(this.value));
+      this.doc = editor.newDoc(text, mime);
       this.doc.on('change', this.onChange.bind(this));
     }
 
