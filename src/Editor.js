@@ -38,14 +38,14 @@ Editor.prototype.swap = function (doc) {
     doc = this.scratchpad;
   }
   if (doc instanceof CodeMirror.Doc) {
-    this.cm.swapDoc(doc);
-    this.cm.focus();
-    this.cmEl.style.display = "block";
     if (this.imageDoc) {
       this.imageDoc = null;
       this.previewEl.style.backgroundImage = "";
       this.imageEl.style.display = "none";
+      this.cmEl.style.display = "block";
     }
+    this.cm.swapDoc(doc);
+    this.cm.focus();
   }
   else {
     if (!this.imageDoc) {
