@@ -8,6 +8,7 @@ var platform = {
     console.log(name, message);
   }
 };
+platform.http = require('git-http')(platform);
 
 var git = {
   repo: require('js-git')(platform),
