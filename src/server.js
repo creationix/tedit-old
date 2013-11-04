@@ -7,7 +7,7 @@ var urlParse = require('url').parse;
 
 var server = http.createServer(onRequest);
 var wss = new WebSocketServer({server: server});
-server.listen(8001);
+server.listen(8002);
 console.log("HTTP server listening on", server.address());
 
 function onRequest(req, res) {
