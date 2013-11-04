@@ -543,7 +543,7 @@ function TreeView(editor, git) {
 
   SymLink.prototype.isDirty = function () {
     if (!this.hash) return true;
-    return this.value !== this.target;
+    return this.value && this.target && this.value !== this.target;
   };
 
   SymLink.prototype.onClick = function () {
@@ -553,6 +553,18 @@ function TreeView(editor, git) {
     this.onChange();
   };
 
+  SymLink.prototype.save = function (callback) {
+    if (!this.isDirty()) return callback();
+    var self = this;
+    var target = this.target;
+    this.repo.saveAs("blob", target, function (err, hash) {
+      if (err) return self.onError(err);
+      self.value = target;
+      self.hash = hash;
+      self.onChange();
+      return callback();
+    });
+  };
 
   this.onContextMenu = function (evt) {
     var items = [];
