@@ -1,4 +1,5 @@
 var domBuilder = require('dombuilder');
+var getMime = require('./mime.js');
 module.exports = TreeView;
 
 /*
@@ -492,8 +493,7 @@ function TreeView(editor, git) {
     var self = this;
     // UTF-8 Encode the value
     var value = this.doc.getValue();
-    var encoded = unescape(encodeURIComponent(value));
-    this.repo.saveAs("blob", encoded, function (err, hash) {
+    this.repo.saveAs("blob", value, function (err, hash) {
       if (err) return self.onError(err);
       self.value = value;
       self.hash = hash;
@@ -503,18 +503,9 @@ function TreeView(editor, git) {
   };
 
   File.prototype.onClick = function () {
-    if (this.value === null) return this.load("text");
-    var mime = getMime(this.name, this.value);
-
+    if (this.value === null) return this.load("blob");
     if (!this.doc) {
-      if (!/(?:\/json$|^text\/)/.test(mime)) {
-        // TODO: open non code files
-        return;
-      }
-      // UTF-8 Decode the string
-      var text = this.value = decodeURIComponent(escape(this.value));
-      this.doc = editor.newDoc(text, mime);
-      this.doc.on('change', this.onChange.bind(this));
+      this.doc = editor.newDoc(this);
     }
 
     if (selected === this) {
@@ -704,36 +695,6 @@ function byName(a, b) {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-// Tiny mime library that helps us know which files we can edit and what icons to show.
-var mimes = {
-  "text/javascript": /\.js$/i,
-  "text/css": /\.css$/i,
-  "text/x-sh": /\.sh$/i,
-  "text/html": /\.html?$/i,
-  "text/x-markdown": /\.(?:md|markdown)$/i,
-  "text/xml": /\.(?:xml|svg)$/i,
-  "text/typescript": /\.ts$/i,
-  "text/x-less": /\.less$/i,
-  "text/cache-manifest": /\.appcache$/i,
-  "application/json": /\.(?:json|webapp)$/i,
-  "image/png": /\.png$/i,
-  "image/jpeg": /\.jpe?g$/i,
-  "image/gif": /\.gif$/i,
-  "video/mpeg": /\.mpe?g$/i,
-  "video/mp4": /\.(?:mp4|m4v)$/i,
-  "video/ogg": /\.ogg$/i,
-  "video/webm": /\.webm$/i,
-  "application/zip": /\.zip$/i,
-  "application/gzip": /\.(?:gz|tgz)$/i,
-  "text/plain": /(?:^(?:README|LICENSE)|\.(?:txt|log)$)/i,
-};
-
-function getMime(path) {
-  for (var mime in mimes) {
-    if (mimes[mime].test(path)) return mime;
-  }
-  return "text/plain";
-}
 
 function getEl(node) { return node.el; }
 

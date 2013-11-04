@@ -1,3 +1,8 @@
+var SplitView = require('./SplitView.js');
+var Editor = require('./Editor.js');
+var TreeView = require('./TreeView.js');
+var LogView = require('./LogView.js');
+
 var platform = {
   sha1: require('git-sha1'),
   bops: require('bops-browser'),
@@ -16,12 +21,16 @@ var git = {
   db: require('git-indexeddb')(platform)
 };
 
-var SplitView = require('./SplitView.js');
-var Editor = require('./Editor.js');
-var TreeView = require('./TreeView.js');
-var LogView = require('./LogView.js');
-
 var body, tree, editor;
+
+var zooms = [
+  25, 33, 50, 67, 75, 90, 100, 110, 120, 125, 150, 175, 200, 250, 300, 400, 500
+];
+
+var index = zooms.indexOf(100);
+var original = 16;
+var size;
+var width, height;
 
 body = new SplitView({
   el: document.body,
@@ -33,6 +42,23 @@ body = new SplitView({
     main: editor = new Editor({
       "Ctrl-Enter": require('./run.js'),
       "Ctrl-S": function () { tree.stageChanges(); },
+      "Ctrl-0": function (cm) {
+        index = zooms.indexOf(100);
+        setSize();
+        cm.refresh();
+      },
+      "Ctrl-=": function (cm) {
+        if (index >= zooms.length - 1) return;
+        index++;
+        setSize();
+        cm.refresh();
+      },
+      "Ctrl--": function (cm) {
+        if (index <= 0) return;
+        index--;
+        setSize();
+        cm.refresh();
+      }
     }),
     side: tree = new TreeView(editor, git)
   }),
@@ -40,8 +66,8 @@ body = new SplitView({
 });
 window.addEventListener('resize', onResize, true);
 onResize();
+setSize();
 
-var width, height;
 function onResize() {
   var newWidth = window.innerWidth;
   var newHeight = window.innerHeight;
@@ -50,3 +76,9 @@ function onResize() {
   body.resize(width, height);
 }
 
+function setSize() {
+  var old = size;
+  size = zooms[index] * original / 100;
+  if (old === size) return;
+  document.body.style.fontSize = size + "px";
+}
