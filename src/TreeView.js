@@ -150,7 +150,12 @@ function TreeView(editor, git) {
     this.nameEl.textContent = this.name;
     if (this.mode === 040000) {
       // Root tree gets a box icon since it represents the repo.
-      if (!this.parent) classes.push("icon-box");
+      if (!this.parent) {
+        var url = this.remote && this.remote.href;
+        if (/\bgithub\b/.test(url)) classes.push("icon-github");
+        else if (/\bbitbucket\b/.test(url)) classes.push("icon-bitbucket");
+        else classes.push("icon-box");
+      }
       // Tree nodes with children are open
       else if (this.children) classes.push("icon-folder-open");
       // Others are closed.
@@ -224,13 +229,6 @@ function TreeView(editor, git) {
     });
   };
 
-  Node.prototype.setRemote = function () {
-    var url = prompt("Enter remote git url");
-    if (!url) return;
-    this.remote = git.remote(url);
-    this.onChange();
-  }
-
   Node.prototype.renameSelf = function () {
     var name = prompt("Enter new name", this.name);
     if (!name || name === this.name) return;
@@ -250,6 +248,7 @@ function TreeView(editor, git) {
   };
 
   Node.prototype.removeSelf = function () {
+    if (this.isDirty() && !confirm("Are your sure you want to discard unstaged changes for " + this.path)) return;
     if (selected === this) deselect();
     else if (selected && this.children) this.clearChildren();
     this.parent.removeChild(this);
@@ -468,6 +467,12 @@ function TreeView(editor, git) {
     new ContextMenu(this, evt, items);
   };
 
+  Tree.prototype.setRemote = function () {
+    var url = prompt("Enter remote git url", this.remote && this.remote.href);
+    if (!url) return;
+    this.remote = git.remote(url);
+    this.onChange();
+  };
 
   function File(repo, mode, name, hash, parent) {
     Node.call(this, repo, mode, name, hash, parent);
@@ -539,10 +544,8 @@ function TreeView(editor, git) {
       items.push({icon: "plus-squared", label: "Commit Staged Changes", action: "createCommit"});
     }
     items.push({icon: "edit", label: "Rename File", action: "renameSelf"});
-    if (!dirty) {
-      items.push({sep:true});
-      items.push({icon: "trash", label: "Delete File", action: "removeSelf"});
-    }
+    items.push({sep:true});
+    items.push({icon: "trash", label: "Delete File", action: "removeSelf"});
     new ContextMenu(this, evt, items);
   };
 
