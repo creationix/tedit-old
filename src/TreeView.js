@@ -232,7 +232,21 @@ function TreeView(editor, git) {
   }
 
   Node.prototype.renameSelf = function () {
-    console.log("TODO: rename self", this);
+    var name = prompt("Enter new name", this.name);
+    if (!name || name === this.name) return;
+    this.name = name;
+    this.updatePath();
+    this.parent.orderChildren();
+    this.parent.onChange();
+  };
+
+  Node.prototype.updatePath = function () {
+    this.path = this.parent.path + "/" + this.name;
+    this.onChange();
+    if (!this.children) return;
+    this.children.forEach(function (child) {
+      child.updatePath();
+    });
   };
 
   Node.prototype.removeSelf = function () {
@@ -569,6 +583,20 @@ function TreeView(editor, git) {
       return callback();
     });
   };
+
+  SymLink.prototype.onContextMenu = function (evt) {
+    var items = [];
+    var dirty = this.isDirty();
+    if (dirty) items.push({icon: "asterisk", label: "Stage All Changes", action: "stageChanges"});
+    if (this.hash !== commitTree[this.path]) {
+      items.push({icon: "plus-squared", label: "Commit Staged Changes", action: "createCommit"});
+    }
+    items.push({icon: "edit", label: "Rename SymLink", action: "renameSelf"});
+    items.push({sep:true});
+    items.push({icon: "trash", label: "Delete SymLink", action: "removeSelf"});
+    new ContextMenu(this, evt, items);
+  };
+
 
   this.onContextMenu = function (evt) {
     var items = [];
