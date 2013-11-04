@@ -729,7 +729,7 @@ function getMime(path) {
   for (var mime in mimes) {
     if (mimes[mime].test(path)) return mime;
   }
-  return "application/octet-stream";
+  return "text/plain";
 }
 
 function getEl(node) { return node.el; }
