@@ -24,8 +24,8 @@ function TreeView(editor, git) {
 
   // selected is a reference to the currently selected node
   // commitTree is a lookup of commit tree hashes for detecting staged changes.
-  var selected, commitTree;
-  var username, email;
+  var selected, commitTrees = {};
+  var username = prefs.get("name"), email = prefs.get("email");
 
   // List of local repos.  key is name
   //   url -  value is remote url (may be null)
@@ -142,10 +142,11 @@ function TreeView(editor, git) {
     });
   };
 
-  Node.prototype.onChange = function () {
+  Node.prototype.onChange = function (recurse) {
     var classes = ["row"];
     if (this.isDirty()) classes.push("dirty");
     if (this.mode & 0111) classes.push("executable");
+    var commitTree = commitTrees[this.repo.name];
     if (this.hash !== commitTree[this.path]) classes.push("staged");
     if (selected === this) classes.push("selected");
     this.rowEl.setAttribute('class', classes.join(" "));
@@ -188,6 +189,11 @@ function TreeView(editor, git) {
       console.error("Invalid mode", this);
     }
     this.iconEl.setAttribute('class', classes.join(" "));
+    if (recurse && this.children) {
+      this.children.forEach(function (child) {
+        child.onChange(true);
+      });
+    }
   };
 
   Node.prototype.stageChanges = function () {
@@ -204,12 +210,18 @@ function TreeView(editor, git) {
   Node.prototype.createCommit = function () {
 
     // Get information from the user.
-    username = username || prompt("Enter your name");
-    if (!username) return;
-    email = email || prompt("Enter your email");
-    if (!email) return;
     var message = prompt("Enter commit message");
     if (!message) return;
+    if (!username) {
+      username = username || prompt("Enter your name");
+      if (!username) return;
+      prefs.set("name", username);
+    }
+    if (!email) {
+      email = email || prompt("Enter your email");
+      if (!email) return;
+      prefs.set("email", email);
+    }
 
     // Find the root tree
     var root = this;
@@ -228,6 +240,11 @@ function TreeView(editor, git) {
         if (err) throw err;
         repo.updateHead(hash, function (err) {
           if (err) throw err;
+          walkCommitTree(repo, root.hash, function (err, commitTree) {
+            if (err) throw err;
+            commitTrees[repo.name] = commitTree;
+            root.onChange(true);
+          });
         });
       });
     });
@@ -464,7 +481,7 @@ function TreeView(editor, git) {
       items.push({sep:true});
       if (this.repo.remote) {
         items.push({icon: "upload-cloud", label: "Push Changes to Remote"});
-        items.push({icon: "download-cloud", label: "Pull Changes from Remote"});
+        items.push({icon: "download-cloud", label: "Pull Changes from Remote", action: "pull"});
       }
       else {
         items.push({icon: "upload-cloud", label: "Set remote url", action: "setRemote"});
@@ -485,6 +502,15 @@ function TreeView(editor, git) {
     prefs.set("repos", repos);
     this.onChange();
   };
+
+  Tree.prototype.pull = function () {
+    var self = this;
+    this.repo.fetch(this.repo.remote, {}, function (err) {
+      if (err) return self.onError(err);
+      self.onChange(true);
+    });
+  };
+
 
   function File(repo, mode, name, hash, parent) {
     Node.call(this, repo, mode, name, hash, parent);
@@ -545,6 +571,7 @@ function TreeView(editor, git) {
     var items = [];
     var dirty = this.isDirty();
     if (dirty) items.push({icon: "asterisk", label: "Stage All Changes", action: "stageChanges"});
+    var commitTree = commitTrees[this.repo.name];
     if (this.hash !== commitTree[this.path]) {
       items.push({icon: "plus-squared", label: "Commit Staged Changes", action: "createCommit"});
     }
@@ -603,6 +630,7 @@ function TreeView(editor, git) {
     var items = [];
     var dirty = this.isDirty();
     if (dirty) items.push({icon: "asterisk", label: "Stage All Changes", action: "stageChanges"});
+    var commitTree = commitTrees[this.repo.name];
     if (this.hash !== commitTree[this.path]) {
       items.push({icon: "plus-squared", label: "Commit Staged Changes", action: "createCommit"});
     }
@@ -709,7 +737,7 @@ function TreeView(editor, git) {
   function addRepo(repo) {
     getRoot(repo, function (err, hash, hashes) {
       if (err) throw err;
-      commitTree = hashes;
+      commitTrees[repo.name] = hashes;
       var root = new Tree(repo, 040000, repo.name, hash, null);
       self.ul.appendChild(root.el);
     });
