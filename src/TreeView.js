@@ -673,6 +673,7 @@ function TreeView(editor, git) {
 
   Object.keys(repos).forEach(function (name) {
     var meta = repos[name];
+    if (Array.isArray(meta) || typeof meta !== "object") meta = repos[name] = {};
     if (!meta.url || typeof meta.url !== "string") meta.url = null;
     if (!meta.opened || Array.isArray(meta.opened) || typeof meta.opened !== "object") meta.opened = {"":true};
 
