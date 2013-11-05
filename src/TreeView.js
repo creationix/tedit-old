@@ -27,7 +27,9 @@ function TreeView(editor, git) {
   var selected, commitTree;
   var username, email;
 
-  // List of local repos.  key is name, value is url (can be null)
+  // List of local repos.  key is name
+  //   url -  value is remote url (may be null)
+  //   opened - hash of paths of opened folders.
   var repos = prefs.get("repos", {});
 
   function deselect() {
@@ -261,6 +263,8 @@ function TreeView(editor, git) {
     // The sub list for children
     this.el.appendChild(domBuilder(["ul$ul"], this));
     this.children = null;
+    if (repos[repo.name].opened[this.path]) this.onClick();
+
   }
   Tree.prototype = Object.create(Node.prototype, {
     constructor: { value: Tree }
@@ -337,6 +341,8 @@ function TreeView(editor, git) {
       // First remove all children of the ul.
       this.ul.textContent = "";
       this.children = null;
+      delete repos[this.repo.name].opened[this.path];
+      prefs.set("repos", repos);
       return this.onChange();
     }
 
@@ -347,6 +353,8 @@ function TreeView(editor, git) {
     });
     // Put folders first.
     this.orderChildren();
+    repos[this.repo.name].opened[this.path] = true;
+    prefs.set("repos", repos);
     this.onChange();
   };
 
@@ -635,13 +643,14 @@ function TreeView(editor, git) {
   };
 
   Object.keys(repos).forEach(function (name) {
-    var url = repos[name];
+    var meta = repos[name];
     var db = git.db(name);
     db.init(function (err) {
       if (err) throw err;
       var repo = git.repo(db);
+      repos[name];
       repo.name = name;
-      if (url) repo.remote = git.remote(url);
+      if (meta.url) repo.remote = git.remote(meta.url);
       addRepo(repo);
     });
   });
@@ -657,7 +666,10 @@ function TreeView(editor, git) {
       if (err) throw err;
       var repo = git.repo(db);
       repo.name = name;
-      repos[name] = null;
+      repos[name] = {
+        url: null,
+        opened: { "": true }
+      };
       prefs.set("repos", repos);
       addRepo(repo);
     });
@@ -682,7 +694,10 @@ function TreeView(editor, git) {
         if (err) throw err;
         repo.name = name;
         repo.remote = remote;
-        repos[name] = remote.href;
+        repos[name] = {
+          url: remote.href,
+          opened: { "": true }
+        };
         prefs.set("repos", repos);
         addRepo(repo);
       });
@@ -697,8 +712,6 @@ function TreeView(editor, git) {
       commitTree = hashes;
       var root = new Tree(repo, 040000, repo.name, hash, null);
       self.ul.appendChild(root.el);
-      // Auto-open tree
-      root.onClick();
     });
   }
 }
