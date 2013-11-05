@@ -2,6 +2,7 @@ var SplitView = require('./SplitView.js');
 var Editor = require('./Editor.js');
 var TreeView = require('./TreeView.js');
 var LogView = require('./LogView.js');
+var prefs = require('./prefs.js');
 
 var platform = {
   sha1: require('git-sha1'),
@@ -27,7 +28,7 @@ var zooms = [
   25, 33, 50, 67, 75, 90, 100, 110, 120, 125, 150, 175, 200, 250, 300, 400, 500
 ];
 
-var index = zooms.indexOf(100);
+var index = prefs.get("zoomIndex", zooms.indexOf(100));
 var original = 16;
 var size;
 var width, height;
@@ -44,18 +45,21 @@ body = new SplitView({
       "Ctrl-S": function () { tree.stageChanges(); },
       "Ctrl-0": function (cm) {
         index = zooms.indexOf(100);
+        prefs.set("zoomIndex", index);
         setSize();
         cm.refresh();
       },
       "Ctrl-=": function (cm) {
         if (index >= zooms.length - 1) return;
         index++;
+        prefs.set("zoomIndex", index);
         setSize();
         cm.refresh();
       },
       "Ctrl--": function (cm) {
         if (index <= 0) return;
         index--;
+        prefs.set("zoomIndex", index);
         setSize();
         cm.refresh();
       }
