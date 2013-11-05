@@ -19,7 +19,7 @@ T("web", T.parallel(
   )
 ));
 
-T("clean", T.rmrf(WEBDIR));
+T("clean", T.rmrf("build"));
 
 T("full", T.serial(
   T.run("clean"),
