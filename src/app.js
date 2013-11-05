@@ -48,7 +48,7 @@ body = new SplitView({
         setSize();
         cm.refresh();
       }
-    }),
+    }, prefs),
     side: tree = new TreeView(editor, git)
   }),
   side: new LogView()

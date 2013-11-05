@@ -7,7 +7,7 @@ window.CodeMirror = CodeMirror;
 
 module.exports = Editor;
 
-function Editor(extraKeys) {
+function Editor(extraKeys, prefs) {
   domBuilder(["$el",
     [".fill$cmEl"],
     [".fill.preview$imageEl", {
@@ -16,7 +16,7 @@ function Editor(extraKeys) {
     }, [".fill$previewEl"]]
   ], this);
   this.cm = CodeMirror(this.cmEl, {
-    value: require('./welcome.js#txt'),
+    value: prefs.get("scratchpad") || require('./welcome.js#txt'),
     mode: "javascript",
     theme: "ambiance",
     // lineNumbers: true,
@@ -24,7 +24,10 @@ function Editor(extraKeys) {
   });
   this.entry = {};
   // The transient global scratchpad.
-  this.scratchpad = this.cm.getDoc();
+  var scratchpad = this.scratchpad = this.cm.getDoc();
+  scratchpad.on('change', function () {
+    prefs.set("scratchpad", scratchpad.getValue());
+  });
 }
 Editor.prototype.resize = function (width, height) {
   this.el.style.width = width + "px";
