@@ -1,5 +1,6 @@
 var domBuilder = require('dombuilder');
 var getMime = require('./mime.js');
+var prefs = require('./prefs.js');
 module.exports = TreeView;
 
 /*
@@ -26,13 +27,15 @@ function TreeView(editor, git) {
   var selected, commitTree;
   var username, email;
 
+  // List of local repos.  key is name, value is url (can be null)
+  var repos = prefs.get("repos", {});
+
   function deselect() {
     var old = selected;
     old.onChange();
     editor.swap();
     selected = null;
   }
-
 
   function ContextMenu(node, evt, items) {
     if (node) {
@@ -306,7 +309,7 @@ function TreeView(editor, git) {
         return callback();
       });
     }
-  }
+  };
 
   Tree.prototype.clearChildren = function () {
     var parent = selected && selected.parent;
@@ -470,6 +473,8 @@ function TreeView(editor, git) {
     var url = prompt("Enter remote git url", this.repo.remote && this.repo.remote.href);
     if (!url) return;
     this.repo.remote = git.remote(url);
+    repos[this.name] = url;
+    prefs.set("repos", repos);
     this.onChange();
   };
 
@@ -629,14 +634,31 @@ function TreeView(editor, git) {
     selected.stageChanges();
   };
 
-  function createRepo() {
-    var name = prompt("Enter name for new repo");
-    if (!name) return;
+  Object.keys(repos).forEach(function (name) {
+    var url = repos[name];
     var db = git.db(name);
     db.init(function (err) {
       if (err) throw err;
       var repo = git.repo(db);
       repo.name = name;
+      if (url) repo.remote = git.remote(url);
+      addRepo(repo);
+    });
+  });
+
+  function createRepo() {
+    var name;
+    do {
+      name = prompt("Enter name for new repo");
+      if (!name) return;
+    } while (name in repos);
+    var db = git.db(name);
+    db.init(function (err) {
+      if (err) throw err;
+      var repo = git.repo(db);
+      repo.name = name;
+      repos[name] = null;
+      prefs.set("repos", repos);
       addRepo(repo);
     });
   }
@@ -646,8 +668,11 @@ function TreeView(editor, git) {
     if (!url) return;
     var remote;
     remote = git.remote(url);
-    var name = prompt("Enter local name", remote.pathname.replace(/\.git$/, '').replace(/^\//, ''));
-    if (!name) return;
+    var name;
+    do {
+      name = prompt("Enter local name", remote.pathname.replace(/\.git$/, '').replace(/^\//, ''));
+      if (!name) return;
+    } while (name in repos);
     var db = git.db(name);
     db.init(function (err) {
       if (err) throw err;
@@ -657,10 +682,14 @@ function TreeView(editor, git) {
         if (err) throw err;
         repo.name = name;
         repo.remote = remote;
+        repos[name] = remote.href;
+        prefs.set("repos", repos);
         addRepo(repo);
       });
     });
   }
+
+
 
   function addRepo(repo) {
     getRoot(repo, function (err, hash, hashes) {
