@@ -488,7 +488,9 @@ function TreeView(editor, git) {
       items.push({sep:true});
       if (this.repo.remote) {
         items.push({icon: "upload-cloud", label: "Push Changes to Remote"});
-        items.push({icon: "download-cloud", label: "Pull Changes from Remote", action: "pull"});
+        if (this.hash === commitTree[this.path]) {
+          items.push({icon: "download-cloud", label: "Pull Changes from Remote", action: "pull"});
+        }
       }
       else {
         items.push({icon: "upload-cloud", label: "Set remote url", action: "setRemote"});
@@ -515,10 +517,23 @@ function TreeView(editor, git) {
   };
 
   Tree.prototype.pull = function () {
-    var self = this;
-    this.repo.fetch(this.repo.remote, {}, function (err) {
-      if (err) return self.onError(err);
-      self.onChange(true);
+    // TODO: warn about non-fast-forward updates loosing changes.
+    var tree = this;
+    tree.clearChildren();
+    this.repo.fetch(this.repo.remote, {}, function (err, refs) {
+      if (err) return tree.onError(err);
+      tree.repo.loadAs("commit", refs.HEAD, function (err, head) {
+        if (err) return tree.onError(err);
+        tree.repo.createRef("refs/tags/current", head.tree, function (err) {
+          if (err) return tree.onError(err);
+          getRoot(tree.repo, function (err, hash, hashes) {
+            if (err) throw err;
+            commitTrees[tree.repo.name] = hashes;
+            var root = new Tree(tree.repo, 040000, tree.repo.name, hash, null);
+            self.ul.replaceChild(root.el, tree.el);
+          });
+        });
+      });
     });
   };
 
