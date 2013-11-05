@@ -461,6 +461,7 @@ function TreeView(editor, git) {
     var items = [];
     var dirty = this.isDirty() || this.hasDirtyChildren();
     if (dirty) items.push({icon: "asterisk", label: "Stage all Changes", action: "stageChanges"});
+    var commitTree = commitTrees[this.repo.name];
     if (this.hash !== commitTree[this.path]) {
       items.push({icon: "plus-squared", label: "Commit Staged Changes", action: "createCommit"});
     }
