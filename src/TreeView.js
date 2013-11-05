@@ -31,6 +31,7 @@ function TreeView(editor, git) {
   //   url -  value is remote url (may be null)
   //   opened - hash of paths of opened folders.
   var repos = prefs.get("repos", {});
+  if (Array.isArray(repos) || !repos || typeof repos !== "object") repos = {};
 
   function deselect() {
     var old = selected;
@@ -672,6 +673,9 @@ function TreeView(editor, git) {
 
   Object.keys(repos).forEach(function (name) {
     var meta = repos[name];
+    if (!meta.url || typeof meta.url !== "string") meta.url = null;
+    if (!meta.opened || Array.isArray(meta.opened) || typeof meta.opened !== "object") meta.opened = {"":true};
+
     var db = git.db(name);
     db.init(function (err) {
       if (err) throw err;
