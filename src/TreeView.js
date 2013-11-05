@@ -1,6 +1,5 @@
 var domBuilder = require('dombuilder');
 var getMime = require('./mime.js');
-var prefs = require('./prefs.js');
 module.exports = TreeView;
 
 /*
@@ -21,6 +20,7 @@ dirty and then discards the non-folders and closed folders inside.
 */
 
 function TreeView(editor, git) {
+  var prefs = git.prefs;
 
   // selected is a reference to the currently selected node
   // commitTree is a lookup of commit tree hashes for detecting staged changes.
