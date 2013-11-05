@@ -491,9 +491,13 @@ function TreeView(editor, git) {
       items.push({icon: "th-list", label: "View Commit History"});
       items.push({icon: "tags", label: "View Tags and Branches"});
       items.push({sep:true});
-      items.push({icon: "trash", label: "Remove Repository"});
+      items.push({icon: "trash", label: "Remove Repository", action: "removeRepo"});
     }
     new ContextMenu(this, evt, items);
+  };
+
+  Tree.prototype.removeRepo = function () {
+    removeRepo(this);
   };
 
   Tree.prototype.setRemote = function () {
@@ -682,6 +686,7 @@ function TreeView(editor, git) {
     db.init(function (err) {
       if (err) throw err;
       var repo = git.repo(db);
+      repo.db = db;
       repos[name];
       repo.name = name;
       if (meta.url) repo.remote = git.remote(meta.url);
@@ -699,6 +704,7 @@ function TreeView(editor, git) {
     db.init(function (err) {
       if (err) throw err;
       var repo = git.repo(db);
+      repo.db = db;
       repo.name = name;
       repos[name] = {
         url: null,
@@ -723,6 +729,7 @@ function TreeView(editor, git) {
     db.init(function (err) {
       if (err) throw err;
       var repo = git.repo(db);
+      repo.db = db;
       console.log("Cloning " + remote.href + " to " + name + "...");
       repo.fetch(remote, {}, function (err) {
         if (err) throw err;
@@ -738,7 +745,16 @@ function TreeView(editor, git) {
     });
   }
 
-
+  function removeRepo(tree) {
+    if (!confirm("Are you sure you want to remove '" + tree.repo.name + "'?")) return;
+    tree.repo.db.clear(function (err) {
+      if (err) throw err;
+    });
+    tree.clearChildren();
+    self.ul.removeChild(tree.el);
+    delete repos[tree.repo.name];
+    prefs.set("repos", repos);
+  }
 
   function addRepo(repo) {
     getRoot(repo, function (err, hash, hashes) {
