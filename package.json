@@ -13,6 +13,6 @@
     "git-net": "0.0.4"
   },
   "devDependencies": {
-    "tim-task": "~0.1.1"
+    "tim-task": "~0.1.4"
   }
 }

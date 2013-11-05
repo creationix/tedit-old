@@ -17,7 +17,7 @@ T("web", T.serial(
       T.build("src/web.js", WEBDIR + "/app.js")
     )
   ),
-  manifest(WEBDIR, [
+  T.manifest(WEBDIR, [
     "index.html",
     "style.css",
     "app.js",
@@ -59,31 +59,4 @@ T.execute(T.run, targets, function (err) {
     process.exit(-1);
   }
 });
-
-function manifest(base, files, target, callback) {
-  var done = false;
-  if (!callback) return manifest.bind(this, base, files, target);
-  var left = files.length;
-  var out = new Array(left);
-  files.forEach(function (name, i) {
-    fs.stat(path.join(base, name), function (err, stat) {
-      if (done) return;
-      if (err) {
-        done = true;
-        return callback(err);
-      }
-      out[i] = name + " # " + stat.size.toString(36) + "-" + stat.mtime.valueOf().toString(36);
-      check();
-    });
-  });
-  function check() {
-    if (--left) return;
-    done = true;
-    out.unshift("CACHE MANIFEST");
-    var targetPath = path.join(base, target);
-    console.log("Manifest " + path.join(base, target));
-    fs.writeFile(targetPath, out.join("\n"), callback);
-  }
-}
-
 
