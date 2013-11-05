@@ -1,4 +1,4 @@
 self.onmessage = function (evt) {
-  
+
   //
 };

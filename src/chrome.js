@@ -18,4 +18,3 @@ require('./chrome-prefs.js')(function (err, prefs) {
     prefs: prefs,
   });
 });
-

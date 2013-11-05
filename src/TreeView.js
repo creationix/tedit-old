@@ -23,7 +23,7 @@ function TreeView(editor, git) {
   var prefs = git.prefs;
 
   window.onbeforeunload = function () {
-    if (selected.isDirty()) return 'You have unsaved changes!';
+    if (selected && selected.isDirty()) return 'You have unsaved changes!';
   };
 
   // selected is a reference to the currently selected node

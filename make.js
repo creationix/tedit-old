@@ -13,9 +13,9 @@ T("web", T.serial(
     T.newer("src", /\.(?:less|css)$/, WEBDIR + "/style.css",
       T.lessc("src/style.less", WEBDIR + "/style.css")
     ),
-    T.newer("src", /\.js$/, WEBDIR + "/app.js",
+    // T.newer("src", /\.js$/, WEBDIR + "/app.js",
       T.build("src/web.js", WEBDIR + "/app.js")
-    )
+    // )
   ),
   T.manifest(WEBDIR, [
     "index.html",
@@ -57,4 +57,3 @@ T.execute(T.run, targets, function (err) {
     process.exit(-1);
   }
 });
-

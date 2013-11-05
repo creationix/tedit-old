@@ -91,5 +91,3 @@ Editor.prototype.newDoc = function (file) {
   }
   console.log("Unknown type " + mime);
 };
-
-

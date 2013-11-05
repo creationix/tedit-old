@@ -32,4 +32,3 @@ require('./app.js')({
   db: require('git-indexeddb')(platform),
   prefs: require('./prefs.js'),
 });
-
