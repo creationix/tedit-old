@@ -131,15 +131,14 @@ ul.contextMenu {
     cursor: pointer;
     &.dirty {
       font-style: italic;
-      &:after {
-        content: "*";
-      }
     }
     &.staged {
       font-weight: bold;
     }
-    &.executable {
-      color: #8F9D6A;
+    &.executable:after {
+      & {
+        content: "*";
+      }
     }
     &:hover {
       background-color: #222;

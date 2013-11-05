@@ -48,8 +48,6 @@ T("full", T.serial(
 ));
 
 
-var fs = require('fs');
-var path = require('path');
 var targets = process.argv.slice(2);
 if (!targets.length) targets.push("full");
 

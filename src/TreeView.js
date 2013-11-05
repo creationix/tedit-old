@@ -22,6 +22,10 @@ dirty and then discards the non-folders and closed folders inside.
 function TreeView(editor, git) {
   var prefs = git.prefs;
 
+  window.onbeforeunload = function () {
+    if (selected.isDirty()) return 'You have unsaved changes!';
+  };
+
   // selected is a reference to the currently selected node
   // commitTree is a lookup of commit tree hashes for detecting staged changes.
   var selected, commitTrees = {};
@@ -460,10 +464,11 @@ function TreeView(editor, git) {
   Tree.prototype.onContextMenu = function (evt) {
     var items = [];
     var dirty = this.isDirty() || this.hasDirtyChildren();
-    if (dirty) items.push({icon: "asterisk", label: "Stage all Changes", action: "stageChanges"});
+    if (dirty) items.push({icon: "floppy", label: "Stage all Changes", action: "stageChanges"});
     var commitTree = commitTrees[this.repo.name];
     if (this.hash !== commitTree[this.path]) {
       items.push({icon: "plus-squared", label: "Commit Staged Changes", action: "createCommit"});
+      // items.push({icon: "plus-squared", label: "Commit Staged Changes", action: "createCommit"});
     }
     if (this.children) {
       items.push({icon: "doc-text", label: "Create File", action: "createFile"});
@@ -553,6 +558,7 @@ function TreeView(editor, git) {
 
     if (selected === this) {
       // Deselect a file reverting to the scratchpad
+      this.stageChanges();
       selected = null;
       this.onChange();
       editor.swap();
@@ -560,6 +566,7 @@ function TreeView(editor, git) {
     else if (selected) {
       // Move selection to a new file
       var old = selected;
+      old.stageChanges();
       selected = this;
       old.onChange();
       this.onChange();
@@ -576,7 +583,7 @@ function TreeView(editor, git) {
   File.prototype.onContextMenu = function (evt) {
     var items = [];
     var dirty = this.isDirty();
-    if (dirty) items.push({icon: "asterisk", label: "Stage All Changes", action: "stageChanges"});
+    if (dirty) items.push({icon: "floppy", label: "Stage All Changes", action: "stageChanges"});
     var commitTree = commitTrees[this.repo.name];
     if (this.hash !== commitTree[this.path]) {
       items.push({icon: "plus-squared", label: "Commit Staged Changes", action: "createCommit"});
@@ -696,6 +703,7 @@ function TreeView(editor, git) {
 
   function createRepo() {
     var name;
+    console.log(repos);
     do {
       name = prompt("Enter name for new repo");
       if (!name) return;
