@@ -2,25 +2,10 @@ var SplitView = require('./SplitView.js');
 var Editor = require('./Editor.js');
 var TreeView = require('./TreeView.js');
 var LogView = require('./LogView.js');
-var prefs = require('./prefs.js');
 
-var platform = {
-  sha1: require('git-sha1'),
-  bops: require('bops-browser'),
-  tcp: require('websocket-tcp-client').tcp,
-  tls: require('websocket-tcp-client').tls,
-  trace: function (name, stream, message) {
-    if (stream) return stream;
-    console.log(name, message);
-  }
-};
-platform.http = require('git-http')(platform);
+module.exports = function (git) {
 
-var git = {
-  repo: require('js-git')(platform),
-  remote: require('git-net')(platform),
-  db: require('git-indexeddb')(platform)
-};
+var prefs = git.prefs;
 
 var body, tree, editor;
 
@@ -86,3 +71,5 @@ function setSize() {
   if (old === size) return;
   document.body.style.fontSize = size + "px";
 }
+
+};
