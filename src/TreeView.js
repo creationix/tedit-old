@@ -487,8 +487,8 @@ function TreeView(editor, git) {
     else {
       items.push({sep:true});
       if (this.repo.remote) {
-        items.push({icon: "upload-cloud", label: "Push Changes to Remote"});
         if (this.hash === commitTree[this.path]) {
+          items.push({icon: "upload-cloud", label: "Push Changes to Remote", action: "push"});
           items.push({icon: "download-cloud", label: "Pull Changes from Remote", action: "pull"});
         }
       }
@@ -534,6 +534,13 @@ function TreeView(editor, git) {
           });
         });
       });
+    });
+  };
+
+  Tree.prototype.push = function () {
+    var tree = this;
+    this.repo.push(this.repo.remote, {}, function (err) {
+      if (err) return tree.onError(err);
     });
   };
 
