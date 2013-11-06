@@ -153,17 +153,23 @@ function TreeView(editor, git) {
   };
 
   Node.prototype.onChange = function (recurse) {
+    var title = this.path;
     var classes = ["row"];
-    if (this.isDirty()) classes.push("dirty");
+    if (this.isDirty()) {
+      title += " (dirty)";
+      classes.push("dirty");
+    }
     var commitTree = commitTrees[this.repo.name];
-    if (this.hash !== commitTree[this.path]) classes.push("staged");
+    if (this.hash !== commitTree[this.path]) {
+      title += " (staged)";
+      classes.push("staged");
+    }
     if (selected === this) classes.push("selected");
     this.rowEl.setAttribute('class', classes.join(" "));
     classes.length = 0;
-    var title = this.path;
     if (!this.parent) {
       var url = this.repo.remote && this.repo.remote.href;
-      title = url;
+      title = url + title;
       if (/\bgithub\b/.test(url)) classes.push("icon-github");
       else if (/\bbitbucket\b/.test(url)) classes.push("icon-bitbucket");
       else if (url) classes.push("icon-box");

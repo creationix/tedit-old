@@ -139,10 +139,10 @@ SplitView.prototype.resize = function (width, height) {
   this.el.style.height = height + "px";
 
   if (this.horizontal) {
-    if (this.size > this.width - 5) this.size = this.width - 5;
+    if (this.size > this.width - 8) this.size = this.width - 8;
   }
   else {
-    if (this.size > this.height - 5) this.size = this.height - 5;
+    if (this.size > this.height - 8) this.size = this.height - 8;
   }
   if (this.size < 0) this.size = 0;
 
@@ -159,12 +159,12 @@ SplitView.prototype.resize = function (width, height) {
     }
   }
   if (this.main) {
-    this.main.el.style[this.orientation] = (this.size + 5) + "px";
+    this.main.el.style[this.orientation] = (this.size + 8) + "px";
     if (this.horizontal) {
-      this.main.resize(width - this.size - 5, height);
+      this.main.resize(width - this.size - 8, height);
     }
     else {
-      this.main.resize(width, height - this.size - 5);
+      this.main.resize(width, height - this.size - 8);
     }
   }
 
