@@ -2,6 +2,7 @@
 module.exports = SplitView;
 
 function SplitView(options) {
+  this.onResize = options.onResize;
   this.orientation = options.orientation || "left";
   this.el = options.el || document.createElement("div");
 
@@ -144,6 +145,8 @@ SplitView.prototype.resize = function (width, height) {
     if (this.size > this.height - 5) this.size = this.height - 5;
   }
   if (this.size < 0) this.size = 0;
+
+  if (this.onResize) this.onResize(this.size);
 
   this.sliderEl.style[this.orientation] = this.size + "px";
   if (this.side) {

@@ -155,22 +155,34 @@ function TreeView(editor, git) {
   Node.prototype.onChange = function (recurse) {
     var classes = ["row"];
     if (this.isDirty()) classes.push("dirty");
-    if (this.mode & 0111) classes.push("executable");
     var commitTree = commitTrees[this.repo.name];
     if (this.hash !== commitTree[this.path]) classes.push("staged");
     if (selected === this) classes.push("selected");
     this.rowEl.setAttribute('class', classes.join(" "));
-    this.rowEl.setAttribute('title', this.hash);
     classes.length = 0;
+    var title = this.path;
+    if (!this.parent) {
+      var url = this.repo.remote && this.repo.remote.href;
+      title = url;
+      if (/\bgithub\b/.test(url)) classes.push("icon-github");
+      else if (/\bbitbucket\b/.test(url)) classes.push("icon-bitbucket");
+      else if (url) classes.push("icon-box");
+    }
+    if (this.mode & 0111) {
+      classes.push("executable");
+      title += " (executable)";
+    }
     this.nameEl.textContent = this.name;
+    this.nameEl.setAttribute('class', classes.join(" "));
+    this.nameEl.setAttribute('title', title);
+    classes.length = 0;
     if (this.mode === 040000) {
       // Root tree gets a box icon since it represents the repo.
       if (!this.parent) {
-        var url = this.repo.remote && this.repo.remote.href;
-        if (/\bgithub\b/.test(url)) classes.push("icon-github");
-        else if (/\bbitbucket\b/.test(url)) classes.push("icon-bitbucket");
-        else classes.push("icon-box");
+        if (this.children) classes.push("icon-book-open");
+        else classes.push("icon-book");
       }
+
       // Tree nodes with children are open
       else if (this.children) classes.push("icon-folder-open");
       // Others are closed.
@@ -199,6 +211,7 @@ function TreeView(editor, git) {
       console.error("Invalid mode", this);
     }
     this.iconEl.setAttribute('class', classes.join(" "));
+    this.iconEl.setAttribute('title', this.hash);
     if (recurse && this.children) {
       this.children.forEach(function (child) {
         child.onChange(true);
@@ -358,11 +371,16 @@ function TreeView(editor, git) {
 
     // If we're already open, we need to close the folder
     if (this.children) {
-      // If there are any dirty descendents, we can't close.
-      if (this.isDirty() || this.children && this.hasDirtyChildren()) return;
-
-      // If selected is a deselect it.
+      // If selected is a descendent, deselect it.
       this.clearChildren();
+
+      // If there are any dirty descendents, we can't close.
+      if (this.isDirty() || this.children && this.hasDirtyChildren()) {
+        this.stageChanges();
+
+        return;
+      }
+
 
       // TODO walk children saving any outstanding changes.
       // First remove all children of the ul.
@@ -481,7 +499,7 @@ function TreeView(editor, git) {
       items.push({icon: "link", label: "Create SymLink", action: "createSymLink"});
     }
     if (this.parent) {
-      items.push({icon: "edit", label: "Rename Folder", action: "renameSelf"});
+      items.push({icon: "pencil", label: "Rename Folder", action: "renameSelf"});
     }
     if (this.parent) {
       if (!dirty) {
@@ -615,7 +633,7 @@ function TreeView(editor, git) {
     if (this.hash !== commitTree[this.path]) {
       items.push({icon: "plus-squared", label: "Commit Staged Changes", action: "createCommit"});
     }
-    items.push({icon: "edit", label: "Rename File", action: "renameSelf"});
+    items.push({icon: "pencil", label: "Rename File", action: "renameSelf"});
     items.push({icon: "asterisk", label: "Toggle Executable", action: "toggleExec"});
     items.push({sep:true});
     items.push({icon: "trash", label: "Delete File", action: "removeSelf"});
@@ -674,7 +692,7 @@ function TreeView(editor, git) {
     if (this.hash !== commitTree[this.path]) {
       items.push({icon: "plus-squared", label: "Commit Staged Changes", action: "createCommit"});
     }
-    items.push({icon: "edit", label: "Rename SymLink", action: "renameSelf"});
+    items.push({icon: "pencil", label: "Rename SymLink", action: "renameSelf"});
     items.push({sep:true});
     items.push({icon: "trash", label: "Delete SymLink", action: "removeSelf"});
     new ContextMenu(this, evt, items);

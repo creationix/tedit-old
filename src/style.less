@@ -115,12 +115,12 @@ ul.contextMenu {
   }
   span.target {
     margin-left: 0.2em;
-    font-style: italic;
     font-weight: inherit;
-    color: #BA4583;
+    // color: #BA4583;
     &:before {
       color: #aaa;
       content: '\2192 ';  /* '→ ' */
+      padding-right: 0.2em;
     }
   }
   .row {
@@ -135,10 +135,11 @@ ul.contextMenu {
     &.staged {
       font-weight: bold;
     }
-    &.executable:after {
-      & {
-        content: "*";
-      }
+    span.executable {
+      background-color: #464D32;
+      color: #fff;
+      border-radius: 0.4em;
+      padding: 0 0.4em;
     }
     &:hover {
       background-color: #222;
@@ -147,17 +148,18 @@ ul.contextMenu {
       background-color: #444;
     }
   }
-  .icon-folder-open, .icon-folder {
+  .icon-link {
+    color: #FFB795;
+  }
+  .icon-folder-open, .icon-folder, .icon-book, .icon-book-open {
     color: #aac6e3;
   }
   .icon-picture, .icon-video {
-    color: #8f9d6a;
+    color: #cda869;
+    // color: #8f9d6a;
   }
   .icon-doc, .icon-doc-text {
-    color: #cda869;
-  }
-  .icon-box {
-    color: #bbc;
+    color: #EED1B3;
   }
 }
 

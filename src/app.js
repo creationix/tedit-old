@@ -17,14 +17,26 @@ var index = prefs.get("zoomIndex", zooms.indexOf(100));
 var original = 16;
 var size;
 var width, height;
+var leftSize = prefs.get("leftSize", Math.min(200, window.innerWidth >> 1));
+var bottomSize = prefs.get("bottomSize", Math.min(200, window.innerHeight >> 1));
 
 body = new SplitView({
   el: document.body,
   orientation: "bottom",
-  size: Math.min(200, window.innerHeight >> 1),
+  size: bottomSize,
+  onResize: function (size) {
+    if (size === bottomSize) return;
+    bottomSize = size;
+    prefs.set("bottomSize", bottomSize);
+  },
   main: new SplitView({
     orientation: "left",
-    size: Math.min(200, window.innerWidth >> 1),
+    size: leftSize,
+    onResize: function (size) {
+      if (size === leftSize) return;
+      leftSize = size;
+      prefs.set("leftSize", leftSize);
+    },
     main: editor = new Editor({
       "Ctrl-Enter": require('./run.js'),
       "Ctrl-S": function () { tree.stageChanges(); },
