@@ -4,6 +4,7 @@ module.exports = LogView;
 function LogView() {
   var log = console.log = console.error = require('domlog');
   log.setup({
+    whiteSpace: "pre",
     transition: "inherit",
     background: "#000",
     overflow: "auto",
