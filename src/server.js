@@ -35,7 +35,7 @@ wss.on('connection', function(ws) {
   var host = match[2];
   var port = parseInt(match[3], 10);
   var base = protocol === "tcp" ? net : tls;
-  console.log("Connecting to %s:%s", host, port)
+  console.log("Connecting to %s:%s", host, port);
   var s = base.connect({host: host, port: port}, onConnect);
   s.on("error", function (err) {
     try {

@@ -75,7 +75,12 @@ function TreeView(editor, git) {
               item.action = node[item.action];
             }
             closeMenu(evt);
-            item.action.call(node);
+            try {
+              item.action.call(node);
+            }
+            catch (err) {
+              console.log(err);
+            }
           };
         }
         else {
@@ -823,7 +828,12 @@ function onClick(node) {
   return function (evt) {
     evt.preventDefault();
     evt.stopPropagation();
-    node.onClick();
+    try {
+      node.onClick();
+    }
+    catch(err) {
+      console.log(err);
+    }
   };
 }
 
