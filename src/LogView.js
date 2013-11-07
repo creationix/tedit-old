@@ -5,6 +5,7 @@ function LogView() {
   var log = console.log = console.error = require('domlog');
   log.setup({
     whiteSpace: "pre",
+    lineHeight: "1em",
     transition: "inherit",
     background: "#000",
     overflow: "auto",
