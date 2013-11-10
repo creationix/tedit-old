@@ -19,6 +19,7 @@ var size;
 var width, height;
 var leftSize = prefs.get("leftSize", Math.min(200, window.innerWidth >> 1));
 var bottomSize = prefs.get("bottomSize", Math.min(200, window.innerHeight >> 1));
+var accessToken = prefs.get("accessToken");
 
 body = new SplitView({
   el: document.body,
@@ -82,6 +83,64 @@ function setSize() {
   size = zooms[index] * original / 100;
   if (old === size) return;
   document.body.style.fontSize = size + "px";
+}
+
+if (!accessToken) {
+  var domBuilder = require('dombuilder');
+  var authButtons = domBuilder(["div", { css: {
+      position: "absolute",
+      top: 0,
+      right: 0
+    }},
+    ["button", {
+      onclick: startOauth,
+      title: "Use this to authenticate with server-assisted oauth2"
+    }, "Github Oauth"],
+    ["button", {
+      onclick: enterToken,
+      title: "Manually create a 'Personal Access Token' and enter it here"
+    }, "Enter Token"]
+  ]);
+  document.body.appendChild(authButtons);
+}
+else {
+  console.log("Authenticated with github");
+}
+
+function cleanAuth() {
+  console.log("Stored Access Token");
+  prefs.set("accessToken", accessToken);
+  document.body.removeChild(authButtons);
+  authButtons = null;
+}
+
+function startOauth(evt) {
+  evt.preventDefault();
+  evt.stopPropagation();
+  window.addEventListener("message", onMessage, false);
+
+  function onMessage(evt) {
+    window.removeEventListener("message", onMessage, false);
+    var tmp = document.createElement('a');
+    tmp.href = evt.origin;
+    if (tmp.hostname !== window.location.hostname) return;
+    accessToken = evt.data.access_token;
+    if (accessToken) cleanAuth();
+    else throw new Error("Problem getting oauth: " + JSON.stringify(evt.data));
+  }
+  window.open("https://github.com/login/oauth/authorize" +
+    "?client_id=f89769973f4842fde5bc" +
+    "&redirect_uri=http://localhost:8002/github-callback" +
+    "&scope=repo,user:email");
+
+}
+
+function enterToken(evt) {
+  evt.preventDefault();
+  evt.stopPropagation();
+  accessToken = prompt("Enter access token from https://github.com/settings/applications");
+  if (!accessToken) return;
+  cleanAuth();
 }
 
 };
