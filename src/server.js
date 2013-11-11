@@ -6,6 +6,14 @@ var net = require('net');
 var tls = require('tls');
 var urlParse = require('url').parse;
 
+// Defaults to dev version to easy local deployment.
+// Dev version must be run from http://localhost:8002
+var githubConfig = {
+  clientId: process.env.GITHUB_CLIENT_ID || "700f0fceacdc16c17cf9",
+  clientSecret: process.env.GITHUB_CLIENT_SECRET || "ad70cde4f687b0a6caadcfc9eeeec7afab524eb4"
+};
+
+
 var server = http.createServer(onRequest);
 var wss = new WebSocketServer({server: server});
 server.listen(8002);
@@ -31,8 +39,8 @@ function onRequest(req, res) {
       "Content-Type": "application/json"
     }
   }, onResponse).end(JSON.stringify({
-    client_id: "f89769973f4842fde5bc",
-    client_secret: "e505b5123b7ff34c0aa7985e689ecf7b1f9a8420",
+    client_id: githubConfig.clientId,
+    client_secret: githubConfig.clientSecret,
     code: uri.query.code
   }));
 

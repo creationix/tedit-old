@@ -2,6 +2,7 @@ var SplitView = require('./SplitView.js');
 var Editor = require('./Editor.js');
 var TreeView = require('./TreeView.js');
 var LogView = require('./LogView.js');
+var githubConfig = require('./github-config.js');
 
 module.exports = function (git) {
 
@@ -129,9 +130,9 @@ function startOauth(evt) {
     else throw new Error("Problem getting oauth: " + JSON.stringify(evt.data));
   }
   window.open("https://github.com/login/oauth/authorize" +
-    "?client_id=f89769973f4842fde5bc" +
-    "&redirect_uri=http://localhost:8002/github-callback" +
-    "&scope=repo,user:email");
+    "?client_id=" + githubConfig.clientId +
+    "&redirect_uri=" + githubConfig.redirectUri +
+    "&scope=public_repo");
 
 }
 
