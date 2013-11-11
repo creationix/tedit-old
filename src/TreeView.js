@@ -1,5 +1,7 @@
 var domBuilder = require('dombuilder');
 var getMime = require('./mime.js');
+var githubConfig = require('./github-config.js');
+
 module.exports = TreeView;
 
 /*
@@ -30,6 +32,7 @@ function TreeView(editor, git) {
   // commitTree is a lookup of commit tree hashes for detecting staged changes.
   var selected, commitTrees = {};
   var username = prefs.get("name"), email = prefs.get("email");
+  var accessToken = prefs.get("accessToken");
 
   // List of local repos.  key is name
   //   url -  value is remote url (may be null)
@@ -709,10 +712,82 @@ function TreeView(editor, git) {
     var items = [];
     items.push({icon: "box", label: "Create new local repository", action: createRepo});
     items.push({icon: "box", label: "Clone from remote Repository", action: cloneRepo});
+    items.push({icon: "github", label: "Mount public github repository", action: mountRepo});
     new ContextMenu(null, evt, items);
   };
 
-  domBuilder([".tree$el", ["ul$ul"]], this);
+  domBuilder([".tree$el",
+    ["ul$ul"],
+    ["$authButtons", { css: {
+      position: "absolute",
+      bottom: 0,
+      right: 0
+    }}, accessToken ? renderLogout() : renderLogin()]
+  ], this);
+
+  function renderLogin() {
+    return [
+      ["button", {
+        onclick: startOauth,
+        title: "Use this to authenticate with server-assisted oauth2"
+      }, "Github Oauth"],
+      ["button", {
+        onclick: enterToken,
+        title: "Manually create a 'Personal Access Token' and enter it here"
+      }, "Enter Token"]
+    ];
+  }
+
+  function renderLogout() {
+    return ["button", {
+      onclick: clearToken,
+      title: "Forget the saves github access token"
+    }, "Forget Auth"];
+  }
+
+  function cleanAuth() {
+    prefs.set("accessToken", accessToken);
+    console.log("Stored Access Token");
+    self.authButtons.textContent = "";
+    self.authButtons.appendChild(domBuilder(renderLogout()));
+  }
+
+  function clearToken() {
+    accessToken = null;
+    prefs.set("accessToken", accessToken);
+    console.log("Forgot Access Token");
+    self.authButtons.textContent = "";
+    self.authButtons.appendChild(domBuilder(renderLogin()));
+  }
+
+  function startOauth(evt) {
+    evt.preventDefault();
+    evt.stopPropagation();
+    window.addEventListener("message", onMessage, false);
+
+    function onMessage(evt) {
+      window.removeEventListener("message", onMessage, false);
+      var tmp = document.createElement('a');
+      tmp.href = evt.origin;
+      if (tmp.hostname !== window.location.hostname) return;
+      accessToken = evt.data.access_token;
+      if (accessToken) cleanAuth();
+      else throw new Error("Problem getting oauth: " + JSON.stringify(evt.data));
+    }
+    window.open("https://github.com/login/oauth/authorize" +
+      "?client_id=" + githubConfig.clientId +
+      "&redirect_uri=" + githubConfig.redirectUri +
+      "&scope=public_repo");
+
+  }
+
+  function enterToken(evt) {
+    evt.preventDefault();
+    evt.stopPropagation();
+    accessToken = prompt("Enter access token from https://github.com/settings/applications");
+    if (!accessToken) return;
+    cleanAuth();
+  }
 
   this.el.js = this;
 
@@ -802,6 +877,10 @@ function TreeView(editor, git) {
         addRepo(repo);
       });
     });
+  }
+
+  function mountRepo() {
+    var root = prompt("Enter username/project");
   }
 
   function removeRepo(tree) {
