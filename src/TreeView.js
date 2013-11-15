@@ -114,7 +114,7 @@ function TreeView(editor, git) {
     }
   }
 
-  function Node(repo, mode, name, hash, parent) {
+  function Node(repo, mode, name, hash, parent, originalHash) {
     this.repo = repo;
     // The gitmode should always be 040000 for Trees
     // and 0100644 or 0100755 for files.
@@ -122,7 +122,9 @@ function TreeView(editor, git) {
     // The name of this entry within it's parent.
     this.name = name;
     // The hash of this entry in git.
-    this.hash = this.originalHash = hash;
+    this.hash = hash;
+    // The hash at this location in the last commit tree.
+    this.originalHash = originalHash;
     // A reference to the parent tree if any.
     this.parent = parent;
     // Calculate the path.
@@ -138,6 +140,11 @@ function TreeView(editor, git) {
     ], this);
     this.el.js = this;
     this.onChange();
+    console.log({
+      path: this.path,
+      hash: this.hash,
+      originalHash: this.originalHash
+    });
   }
 
   Node.prototype.onError = function (err) {
@@ -177,10 +184,10 @@ function TreeView(editor, git) {
     this.rowEl.setAttribute('class', classes.join(" "));
     classes.length = 0;
     if (!this.parent) {
-      var meta = repos[this.repo.name];
+      var meta = repos[this.name];
       var url = this.repo.remote && this.repo.remote.href;
       if (meta.github) url = "github://" + meta.github;
-      title = url + title;
+      title = (url || meta.name) + title;
       if (/\bgithub\b/.test(url)) classes.push("icon-github");
       else if (/\bbitbucket\b/.test(url)) classes.push("icon-bitbucket");
       else if (url) classes.push("icon-box");
@@ -242,10 +249,9 @@ function TreeView(editor, git) {
     while (root.parent) root = root.parent;
     root.save(function () {
       if (root.hash === root.current) return;
-      root.repo.updateRef("refs/tags/current", root.hash, function (err) {
-        if (err) return root.onError(err);
-        root.current = root.hash;
-      });
+      var meta = repos[root.name];
+      meta.currentTree = root.hash;
+      prefs.set("repos", repos);
     });
   };
 
@@ -316,8 +322,7 @@ function TreeView(editor, git) {
   };
 
   function Tree(repo, mode, name, hash, parent, originalHash) {
-    Node.call(this, repo, mode, name, hash, parent);
-    if (originalHash) this.originalHash = originalHash;
+    Node.call(this, repo, mode, name, hash, parent, originalHash);
     // The sub list for children
     this.el.appendChild(domBuilder(["ul$ul"], this));
     this.children = null;
@@ -411,14 +416,17 @@ function TreeView(editor, git) {
 
     var self = this;
     // Create UI instances for the children.
-    this.children = this.value.map(function (entry) {
-      return self.childFromEntry(entry);
+    asyncMap(this.value, function (entry, callback) {
+      self.childFromEntry(entry, callback);
+    }, function (err, children) {
+      if (err) throw err;
+      self.children = children;
+      // Put folders first.
+      self.orderChildren();
+      repos[self.repo.name].opened[self.path] = true;
+      prefs.set("repos", repos);
+      self.onChange();
     });
-    // Put folders first.
-    this.orderChildren();
-    repos[this.repo.name].opened[this.path] = true;
-    prefs.set("repos", repos);
-    this.onChange();
   };
 
   Tree.prototype.orderChildren = function () {
@@ -427,13 +435,31 @@ function TreeView(editor, git) {
     this.ul.appendChild(domBuilder(this.children.map(getEl)));
   };
 
-  Tree.prototype.childFromEntry = function (entry) {
+  Tree.prototype.childFromEntry = function (entry, callback) {
+    if (entry.originalHash === undefined) {
+      if (!this.originalHash) {
+        entry.originalHash = null;
+      }
+      else if (this.hash === this.originalHash) {
+        entry.originalHash = entry.hash;
+      }
+      else {
+        var self = this;
+        return this.repo.loadAs("tree", this.originalHash, function (err, tree) {
+          if (err) throw err;
+          var old = byName(tree, entry.name);
+          entry.originalHash = old ? old.hash : null;
+          return self.childFromEntry(entry, callback);
+        });
+      }
+    }
     var Constructor;
     if (entry.mode === 040000) Constructor = Tree;
     else if (entry.mode === 0100644 || entry.mode === 0100755) Constructor = File;
     else if (entry.mode === 0120000) Constructor = SymLink;
     else throw "TODO: Implement more mode types";
-    return new Constructor(this.repo, entry.mode, entry.name, entry.hash, this);
+    var child = new Constructor(this.repo, entry.mode, entry.name, entry.hash, this, entry.originalHash);
+    callback(null, child);
   };
 
   Tree.prototype.addChild = function (child) {
@@ -454,35 +480,41 @@ function TreeView(editor, git) {
   Tree.prototype.createFile = function () {
     var name = prompt("Enter name for new file");
     if (!name) return;
-    var child = this.childFromEntry({
+    this.childFromEntry({
       mode: 0100644,
       name: name,
       hash: undefined
+    }, function (err, child) {
+      if (err) throw err;
+      this.addChild(child);
     });
-    this.addChild(child);
   };
 
   Tree.prototype.createFolder = function () {
     var name = prompt("Enter name for new folder");
     if (!name) return;
-    var child = this.childFromEntry({
+    this.childFromEntry({
       mode: 040000,
       name: name,
       hash: undefined
+    }, function (err, child) {
+      if (err) throw err;
+      this.addChild(child);
     });
-    this.addChild(child);
   };
 
   Tree.prototype.createSymLink = function () {
     var name = prompt("Enter name for the new symlink");
     if (!name) return;
 
-    var child = this.childFromEntry({
+    this.childFromEntry({
       mode: 0120000,
       name: name,
       hash: undefined
+    }, function (err, child) {
+      if (err) throw err;
+      this.addChild(child);
     });
-    this.addChild(child);
   };
 
   Tree.prototype.isDirty = function () {
@@ -554,6 +586,7 @@ function TreeView(editor, git) {
 
   Tree.prototype.pull = function () {
     // TODO: warn about non-fast-forward updates loosing changes.
+    throw "MONKEY!" // TODO: re-implement this
     var tree = this;
     tree.clearChildren();
     this.repo.fetch(this.repo.remote, {}, function (err, refs) {
@@ -581,8 +614,8 @@ function TreeView(editor, git) {
   };
 
 
-  function File(repo, mode, name, hash, parent) {
-    Node.call(this, repo, mode, name, hash, parent);
+  function File(repo, mode, name, hash, parent, originalHash) {
+    Node.call(this, repo, mode, name, hash, parent, originalHash);
     // Reference to the editor instance
     this.doc = null;
   }
@@ -654,8 +687,8 @@ function TreeView(editor, git) {
     this.parent.onChange();
   };
 
-  function SymLink(repo, mode, name, hash, parent) {
-    Node.call(this, repo, mode, name, hash, parent);
+  function SymLink(repo, mode, name, hash, parent, originalHash) {
+    Node.call(this, repo, mode, name, hash, parent, originalHash);
     var self = this;
     if (hash) repo.loadAs("text", hash, function (err, target) {
       if (err) return self.onError(err);
@@ -868,14 +901,14 @@ function TreeView(editor, git) {
     });
   }
 
-  function removeRepo(tree) {
-    if (!confirm("Are you sure you want to remove '" + tree.repo.name + "'?")) return;
-    tree.repo.db && tree.repo.db.clear(function (err) {
+  function removeRepo(root) {
+    if (!confirm("Are you sure you want to remove '" + root.repo.name + "'?")) return;
+    root.repo.db && root.repo.db.clear(function (err) {
       if (err) throw err;
     });
-    tree.clearChildren();
-    self.ul.removeChild(tree.el);
-    delete repos[tree.repo.name];
+    root.clearChildren();
+    self.ul.removeChild(root.el);
+    delete repos[root.name];
     prefs.set("repos", repos);
   }
 
@@ -979,14 +1012,18 @@ function TreeView(editor, git) {
         changed = true;
         meta.currentTree = originalTree;
       }
+      console.log({
+        name: name,
+        lastCommit: meta.lastCommit,
+        currentTree: meta.currentTree,
+        originalTree: originalTree
+      });
       if (changed) prefs.set("repos", repos);
       var root = new Tree(repo, 040000, name, meta.currentTree, null, originalTree);
       self.ul.appendChild(root.el);
     }
   }
 
-  // function addRepo(meta, repo, commitTree) {
-  // }
 }
 
 TreeView.prototype.resize = function (width, height) {
@@ -1025,33 +1062,6 @@ function onClick(node) {
   };
 }
 
-function getRoot(repo, callback) {
-  // path-to-hash lookup for the latest commit.
-  return repo.loadAs("commit", "HEAD", function (err, head) {
-    if (err) return callback(err);
-    return repo.readRef("refs/tags/current", function (err, current) {
-      if (err) return callback(err);
-      if (!current && head) {
-        current = head.tree;
-        repo.createRef("refs/tags/current", current, function (err) {
-          if (err) throw err;
-        });
-      }
-
-      if (!current) {
-        return repo.saveAs("tree", [], function (err, current) {
-          repo.updateRef("refs/tags/current", current, function (err) {
-            if (err) return callback(err);
-            return callback(null, current, {});
-          });
-        });
-      }
-      if (!head) return callback(null, current, {});
-      return callback(null, current);
-    });
-  });
-}
-
 // Tiny helper to make menu generation code cleaner
 function addSection(items, group) {
   if (!group.length) return;
@@ -1071,3 +1081,25 @@ function nodeMenu(node) {
   return items;
 }
 
+function asyncMap(array, map, callback) {
+  if (!array.length) return callback(null, []);
+  var done = false;
+  var left = array.length;
+  var result = new Array(left);
+  array.forEach(function (item, i) {
+    map(item, function (err, item) {
+      if (done) return;
+      if (err) { done = true; return callback(err); }
+      result[i] = item;
+      if (--left) return;
+      callback(null, result);
+    });
+  });
+}
+
+function byName(array, name) {
+  for (var i = 0, l = array.length; i < l; i++) {
+    var value = array[i];
+    if (value.name === name) return value;
+  }
+}
