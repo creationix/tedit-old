@@ -140,11 +140,6 @@ function TreeView(editor, git) {
     ], this);
     this.el.js = this;
     this.onChange();
-    console.log({
-      path: this.path,
-      hash: this.hash,
-      originalHash: this.originalHash
-    });
   }
 
   Node.prototype.onError = function (err) {
@@ -256,13 +251,22 @@ function TreeView(editor, git) {
   };
 
   Node.prototype.createCommit = function () {
+    // Get the root tree, the meta and the repo
+    var root = this;
+    while (root.parent) root = root.parent;
+    var repo = this.repo;
+    var meta = repos[repo.name];
 
     // Get information from the user.
     var message = prompt("Enter commit message");
     if (!message) return;
-    var repo = this.repo;
 
-    if (!repo.github) {
+    // Build the commit object
+    var commit = {
+      tree: meta.currentTree,
+      message: message
+    };
+    if (!meta.github) {
       if (!username) {
         username = username || prompt("Enter your name");
         if (!username) return;
@@ -273,27 +277,33 @@ function TreeView(editor, git) {
         if (!email) return;
         prefs.set("email", email);
       }
+      commit.author = { name: username, email: email };
+    }
+    if (meta.lastCommit) {
+      commit.parent = meta.lastCommit;
     }
 
-    // Find the root tree
-    var root = this;
-    while (root.parent) root = root.parent;
-
-    repo.loadAs("commit", "HEAD", function (err, head, hash) {
+    repo.saveAs("commit", commit, function (err, hash) {
       if (err) throw err;
-      repo.saveAs("commit", {
-        tree: root.hash,
-        parent: hash,
-        author: repo.github ? undefined : { name: username, email: email },
-        message: message
-      }, function (err, hash) {
+      meta.lastCommit = hash;
+      prefs.set("repos", repos);
+      root.clearStage();
+      repo.updateHead(hash, function (err) {
         if (err) throw err;
-        repo.updateHead(hash, function (err) {
-          if (err) throw err;
-          root.onChange(true);
-        });
       });
     });
+  };
+
+  Node.prototype.clearStage = function () {
+    if (this.hash !== this.originalHash) {
+      this.originalHash = this.hash;
+      this.onChange();
+    }
+    if (this.children) {
+      this.children.forEach(function (child) {
+        child.clearStage();
+      });
+    }
   };
 
   Node.prototype.renameSelf = function () {
@@ -447,7 +457,7 @@ function TreeView(editor, git) {
         var self = this;
         return this.repo.loadAs("tree", this.originalHash, function (err, tree) {
           if (err) throw err;
-          var old = byName(tree, entry.name);
+          var old = findByName(tree, entry.name);
           entry.originalHash = old ? old.hash : null;
           return self.childFromEntry(entry, callback);
         });
@@ -1012,12 +1022,6 @@ function TreeView(editor, git) {
         changed = true;
         meta.currentTree = originalTree;
       }
-      console.log({
-        name: name,
-        lastCommit: meta.lastCommit,
-        currentTree: meta.currentTree,
-        originalTree: originalTree
-      });
       if (changed) prefs.set("repos", repos);
       var root = new Tree(repo, 040000, name, meta.currentTree, null, originalTree);
       self.ul.appendChild(root.el);
@@ -1097,7 +1101,7 @@ function asyncMap(array, map, callback) {
   });
 }
 
-function byName(array, name) {
+function findByName(array, name) {
   for (var i = 0, l = array.length; i < l; i++) {
     var value = array[i];
     if (value.name === name) return value;
