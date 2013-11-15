@@ -3,6 +3,7 @@ var getMime = require('./mime.js');
 var githubConfig = require('./github-config.js');
 var XHR = require('js-github/src/xhr.js');
 var githubRepo = require('js-github');
+var progressParser = require('./progress-parser.js');
 
 module.exports = TreeView;
 
@@ -31,8 +32,7 @@ function TreeView(editor, git) {
   };
 
   // selected is a reference to the currently selected node
-  // commitTree is a lookup of commit tree hashes for detecting staged changes.
-  var selected, commitTrees = {};
+  var selected;
   var username = prefs.get("name"), email = prefs.get("email");
   var accessToken = prefs.get("accessToken");
   var request = accessToken ? XHR("", accessToken) : null;
@@ -122,7 +122,7 @@ function TreeView(editor, git) {
     // The name of this entry within it's parent.
     this.name = name;
     // The hash of this entry in git.
-    this.hash = hash;
+    this.hash = this.originalHash = hash;
     // A reference to the parent tree if any.
     this.parent = parent;
     // Calculate the path.
@@ -158,6 +158,10 @@ function TreeView(editor, git) {
     });
   };
 
+  Node.prototype.isStaged = function () {
+    return this.hash !== this.originalHash;
+  };
+
   Node.prototype.onChange = function (recurse) {
     var title = this.path;
     var classes = ["row"];
@@ -165,8 +169,7 @@ function TreeView(editor, git) {
       title += " (dirty)";
       classes.push("dirty");
     }
-    var commitTree = commitTrees[this.repo.name];
-    if (this.hash !== commitTree[this.path]) {
+    if (this.isStaged()) {
       title += " (staged)";
       classes.push("staged");
     }
@@ -174,8 +177,9 @@ function TreeView(editor, git) {
     this.rowEl.setAttribute('class', classes.join(" "));
     classes.length = 0;
     if (!this.parent) {
+      var meta = repos[this.repo.name];
       var url = this.repo.remote && this.repo.remote.href;
-      if (this.repo.github) url = "https://github.com/" + this.repo.github + ".git";
+      if (meta.github) url = "github://" + meta.github;
       title = url + title;
       if (/\bgithub\b/.test(url)) classes.push("icon-github");
       else if (/\bbitbucket\b/.test(url)) classes.push("icon-bitbucket");
@@ -280,11 +284,7 @@ function TreeView(editor, git) {
         if (err) throw err;
         repo.updateHead(hash, function (err) {
           if (err) throw err;
-          walkCommitTree(repo, root.hash, function (err, commitTree) {
-            if (err) throw err;
-            commitTrees[repo.name] = commitTree;
-            root.onChange(true);
-          });
+          root.onChange(true);
         });
       });
     });
@@ -315,8 +315,9 @@ function TreeView(editor, git) {
     this.parent.removeChild(this);
   };
 
-  function Tree(repo, mode, name, hash, parent) {
+  function Tree(repo, mode, name, hash, parent, originalHash) {
     Node.call(this, repo, mode, name, hash, parent);
+    if (originalHash) this.originalHash = originalHash;
     // The sub list for children
     this.el.appendChild(domBuilder(["ul$ul"], this));
     this.children = null;
@@ -502,46 +503,39 @@ function TreeView(editor, git) {
   };
 
   Tree.prototype.onContextMenu = function (evt) {
-    var items = [];
-    var dirty = this.isDirty() || this.hasDirtyChildren();
-    if (dirty) items.push({icon: "floppy", label: "Stage all Changes", action: "stageChanges"});
-    var commitTree = commitTrees[this.repo.name];
-    if (this.hash !== commitTree[this.path]) {
-      items.push({icon: "plus-squared", label: "Commit Staged Changes", action: "createCommit"});
-      // items.push({icon: "plus-squared", label: "Commit Staged Changes", action: "createCommit"});
-    }
+    var items = nodeMenu(this), group = [];
     if (this.children) {
-      items.push({icon: "doc-text", label: "Create File", action: "createFile"});
-      items.push({icon: "folder", label: "Create Folder", action: "createFolder"});
-      items.push({icon: "link", label: "Create SymLink", action: "createSymLink"});
+      group.push({icon: "doc-text", label: "Create File", action: "createFile"});
+      group.push({icon: "folder", label: "Create Folder", action: "createFolder"});
+      group.push({icon: "link", label: "Create SymLink", action: "createSymLink"});
     }
+    addSection(items, group);
     if (this.parent) {
-      items.push({icon: "pencil", label: "Rename Folder", action: "renameSelf"});
-    }
-    if (this.parent) {
-      if (!dirty) {
-        items.push({sep:true});
-        items.push({icon: "trash", label: "Delete Folder", action: "removeSelf"});
+      group.push({icon: "pencil", label: "Rename Folder", action: "renameSelf"});
+      if (!(this.isDirty() || this.hasDirtyChildren())) {
+        group.push({icon: "trash", label: "Delete Folder", action: "removeSelf"});
       }
     }
     else {
-      if (!this.repo.github) {
-        items.push({sep:true});
-        if (this.repo.remote) {
-          if (this.hash === commitTree[this.path]) {
-            items.push({icon: "upload-cloud", label: "Push Changes to Remote", action: "push"});
-            items.push({icon: "download-cloud", label: "Pull Changes from Remote", action: "pull"});
-          }
+      if (this.remote) {
+        if (this.repo.fetchPack) {
+          group.push({icon: "download-cloud", label: "Fetch new objects from remote", action: "fetchPack"});
         }
-        else {
-          items.push({icon: "upload-cloud", label: "Set remote url", action: "setRemote"});
+        if (this.repo.sendPack()) {
+          group.push({icon: "upload-cloud", label: "Send new objects to remote", action: "sendPack"});
         }
-        items.push({icon: "th-list", label: "View Commit History"});
-        items.push({icon: "tags", label: "View Tags and Branches"});
       }
-      items.push({sep:true});
-      items.push({icon: "trash", label: "Remove Repository", action: "removeRepo"});
+      else {
+        if (this.repo.fetchPack || this.repo.sendPack) {
+          group.push({icon: "upload-cloud", label: "Set remote", action: "setRemote"});
+        }
+      }
+      group.push({icon: "th-list", label: "View Commit History"});
+      group.push({icon: "tags", label: "View Tags and Branches"});
+      addSection(items, group);
+      group.push({icon: "trash", label: "Remove Repository", action: "removeRepo"});
     }
+    addSection(items, group);
     new ContextMenu(this, evt, items);
   };
 
@@ -569,9 +563,8 @@ function TreeView(editor, git) {
         tree.repo.updateRef("refs/tags/current", head.tree, function (err) {
           if (err) return tree.onError(err);
           tree.current = head.tree;
-          getRoot(tree.repo, function (err, hash, hashes) {
+          getRoot(tree.repo, function (err, hash) {
             if (err) throw err;
-            commitTrees[tree.repo.name] = hashes;
             var root = new Tree(tree.repo, 040000, tree.repo.name, hash, null);
             self.ul.replaceChild(root.el, tree.el);
           });
@@ -646,17 +639,12 @@ function TreeView(editor, git) {
   };
 
   File.prototype.onContextMenu = function (evt) {
-    var items = [];
-    var dirty = this.isDirty();
-    if (dirty) items.push({icon: "floppy", label: "Stage All Changes", action: "stageChanges"});
-    var commitTree = commitTrees[this.repo.name];
-    if (this.hash !== commitTree[this.path]) {
-      items.push({icon: "plus-squared", label: "Commit Staged Changes", action: "createCommit"});
-    }
-    items.push({icon: "pencil", label: "Rename File", action: "renameSelf"});
-    items.push({icon: "asterisk", label: "Toggle Executable", action: "toggleExec"});
-    items.push({sep:true});
-    items.push({icon: "trash", label: "Delete File", action: "removeSelf"});
+    var items = nodeMenu(this), group = [];
+    group.push({icon: "pencil", label: "Rename File", action: "renameSelf"});
+    group.push({icon: "asterisk", label: "Toggle Executable", action: "toggleExec"});
+    addSection(items, group);
+    group.push({icon: "trash", label: "Delete File", action: "removeSelf"});
+    addSection(items, group);
     new ContextMenu(this, evt, items);
   };
 
@@ -705,16 +693,11 @@ function TreeView(editor, git) {
   };
 
   SymLink.prototype.onContextMenu = function (evt) {
-    var items = [];
-    var dirty = this.isDirty();
-    if (dirty) items.push({icon: "asterisk", label: "Stage All Changes", action: "stageChanges"});
-    var commitTree = commitTrees[this.repo.name];
-    if (this.hash !== commitTree[this.path]) {
-      items.push({icon: "plus-squared", label: "Commit Staged Changes", action: "createCommit"});
-    }
-    items.push({icon: "pencil", label: "Rename SymLink", action: "renameSelf"});
-    items.push({sep:true});
-    items.push({icon: "trash", label: "Delete SymLink", action: "removeSelf"});
+    var items = nodeMenu(this), group = [];
+    group.push({icon: "pencil", label: "Rename SymLink", action: "renameSelf"});
+    addSection(items, group);
+    group.push({icon: "trash", label: "Delete SymLink", action: "removeSelf"});
+    addSection(items, group);
     new ContextMenu(this, evt, items);
   };
 
@@ -827,81 +810,21 @@ function TreeView(editor, git) {
     selected.stageChanges();
   };
 
-  Object.keys(repos).forEach(function (name) {
-    var meta = repos[name];
-    if (Array.isArray(meta) || typeof meta !== "object") meta = repos[name] = {};
-    if (!meta.url || typeof meta.url !== "string") meta.url = null;
-    if (!meta.opened || Array.isArray(meta.opened) || typeof meta.opened !== "object") meta.opened = {"":true};
-
-    if (meta.github) {
-      if (!accessToken) return;
-      var repo = githubRepo(meta.github, accessToken);
-      repo.github = meta.github;
-      repo.name = name;
-      return addRepo(repo);
-    }
-
-    var db = git.db(name);
-    db.init(function (err) {
-      if (err) throw err;
-      var repo = git.repo(db);
-      repo.db = db;
-      repos[name];
-      repo.name = name;
-      if (meta.url) repo.remote = git.remote(meta.url);
-      addRepo(repo);
+  setTimeout(function () {
+    Object.keys(repos).forEach(function (name) {
+      livenRepo(name, repos[name]);
     });
-  });
+  }, 0);
 
   function createRepo() {
     var name;
-    console.log(repos);
     do {
       name = prompt("Enter name for new repo");
       if (!name) return;
     } while (name in repos);
-    var db = git.db(name);
-    db.init(function (err) {
-      if (err) throw err;
-      var repo = git.repo(db);
-      repo.db = db;
-      repo.name = name;
-      repos[name] = {
-        url: null,
-        opened: { "": true }
-      };
-      prefs.set("repos", repos);
-      addRepo(repo);
-    });
-  }
-
-  function cloneRepo() {
-    var url = prompt("Enter git url to clone");
-    if (!url) return;
-    var remote;
-    remote = git.remote(url);
-    var name;
-    do {
-      name = prompt("Enter local name", remote.pathname.replace(/\.git$/, '').replace(/^\//, ''));
-      if (!name) return;
-    } while (name in repos);
-    var db = git.db(name);
-    db.init(function (err) {
-      if (err) throw err;
-      var repo = git.repo(db);
-      repo.db = db;
-      console.log("Cloning " + remote.href + " to " + name + "...");
-      repo.fetch(remote, {}, function (err) {
-        if (err) throw err;
-        repo.name = name;
-        repo.remote = remote;
-        repos[name] = {
-          url: remote.href,
-          opened: { "": true }
-        };
-        prefs.set("repos", repos);
-        addRepo(repo);
-      });
+    livenRepo(name, {
+      currentTree: null,
+      lastCommit: null
     });
   }
 
@@ -915,19 +838,34 @@ function TreeView(editor, git) {
     }
     var root = prompt("Enter username/project", githubLogin + "/");
     if (!root) return;
+    var name = root;
+    var n = 1;
+    while (name in repos) {
+      name = root + "-" + n++;
+    }
     return request("GET", "/repos/" + root, onRepo);
     function onRepo(err, result) {
       if (err) throw err;
-      var repo = githubRepo(root, accessToken);
-      repo.name = result.name;
-      repo.description = result.description;
-      repos[repo.name] = {
-        github: root,
-        opened: { "": true }
-      };
-      prefs.set("repos", repos);
-      addRepo(repo);
+      livenRepo(name, {
+        github:root,
+        description: result.description,
+      });
     }
+  }
+
+  function cloneRepo() {
+    var url = prompt("Enter git url to clone");
+    if (!url) return;
+    var remote = git.remote(url);
+    var name;
+    do {
+      name = prompt("Enter local name", remote.pathname.replace(/\.git$/, '').replace(/^\//, ''));
+      if (!name) return;
+    } while (name in repos);
+    livenRepo(name, {
+      url: url,
+      clone: true
+    });
   }
 
   function removeRepo(tree) {
@@ -941,15 +879,114 @@ function TreeView(editor, git) {
     prefs.set("repos", repos);
   }
 
-  function addRepo(repo) {
-    getRoot(repo, function (err, hash, hashes) {
+  function livenRepo(name, meta) {
+    var changed = false, repo;
+    // Meta needs to be an object.
+    if (Array.isArray(meta) || typeof meta !== "object") meta = {};
+    // url, github, currentTree, and lastCommit need to be strings or not there
+    if (meta.url && typeof meta.url !== "string") {
+      delete meta.url;
+      changed = true;
+    }
+    if (meta.github && typeof meta.github !== "string") {
+      delete meta.github;
+      changed = true;
+    }
+    if (meta.currentTree && typeof meta.currentTree !== "string") {
+      delete meta.currentTree;
+      changed = true;
+    }
+    if (meta.lastCommit && typeof meta.lastCommit !== "string") {
+      delete meta.lastCommit;
+      changed = true;
+    }
+    // meta.opened needs to be an object
+    if (!meta.opened || Array.isArray(meta.opened) || typeof meta.opened !== "object") {
+      meta.opened = {"":true};
+      changed = true;
+    }
+    if (meta.name !== name) {
+      meta.name = name;
+      changed = true;
+    }
+    if (repos[name] !== meta) {
+      repos[name] = meta;
+      changed = true;
+    }
+
+    // Create mounted github repos.
+    if (meta.github) {
+      if (!accessToken) {
+        console.error("Can't mount github repo without access token");
+        return;
+      }
+      repo = githubRepo(meta.github, accessToken);
+      return findHead();
+    }
+
+    // Create or load local database
+    var db = git.db(name);
+    return db.init(function (err) {
       if (err) throw err;
-      commitTrees[repo.name] = hashes;
-      var root = new Tree(repo, 040000, repo.name, hash, null);
-      root.current = hash;
-      self.ul.appendChild(root.el);
+      repo = git.repo(db);
+      return findHead();
     });
+
+    function findHead() {
+      repo.name = name;
+      meta.name = name;
+      if (meta.url) repo.remote = git.remote(meta.url);
+
+      if (!meta.clone) return findCommit();
+
+      delete meta.clone;
+      // TODO: rename repo.fetch to repo.clone
+      var last = Date.now();
+      return repo.fetch(repo.remote, {
+        onProgress: progressParser(function (message, num, max) {
+          var now = Date.now();
+          if (now - last > 100 || !max || num === max) {
+            if (max) message += " (" + num + "/" + max + ")";
+            console.log(message);
+            last = now;
+          }
+        })
+      }, function (err, refs) {
+        if (err) throw err;
+        meta.lastCommit = refs.HEAD;
+        changed = true;
+        findCommit();
+      });
+    }
+
+    function findCommit() {
+
+      // If the lastCommit is unknown, assume HEAD
+      if (meta.lastCommit || meta.lastCommit === undefined) {
+        return repo.loadAs("commit", meta.lastCommit || "HEAD", onCommit);
+      }
+      return onCommit();
+    }
+
+    function onCommit(err, commit, hash) {
+      if (err) throw err;
+      var originalTree = commit ? commit.tree : null;
+      if (meta.lastCommit === undefined && hash) {
+        changed = true;
+        meta.lastCommit = hash;
+      }
+      if (meta.currentTree === undefined) {
+        changed = true;
+        meta.currentTree = originalTree;
+      }
+      if (changed) prefs.set("repos", repos);
+      var root = new Tree(repo, 040000, name, meta.currentTree, null, originalTree);
+      self.ul.appendChild(root.el);
+    }
   }
+
+  // function addRepo(meta, repo, commitTree) {
+  // }
 }
 
 TreeView.prototype.resize = function (width, height) {
@@ -988,44 +1025,6 @@ function onClick(node) {
   };
 }
 
-function walkCommitTree(repo, root, callback) {
-  var commitTree = {};
-  return callback(null, commitTree);
-  return walk("", root, function (err) {
-    if (err) return callback(err);
-    return callback(null, commitTree);
-  });
-
-  function walk(path, hash, callback) {
-    var done = false, left = 1;
-    commitTree[path] = hash;
-    console.log("WALK", path);
-    repo.loadAs("tree", hash, function (err, tree) {
-      if (err) return callback(err);
-      tree.forEach(function (entry) {
-        var childPath = path + "/" + entry.name;
-        commitTree[childPath] = entry.hash;
-        if (entry.mode !== 040000) return;
-        left++;
-        return walk(childPath, entry.hash, check);
-      });
-      check();
-    });
-    function check(err) {
-      if (done) return;
-      if (err) {
-        done = true;
-        return callback(err);
-      }
-      if (--left) return;
-      done = true;
-      return callback();
-    }
-  }
-
-
-}
-
 function getRoot(repo, callback) {
   // path-to-hash lookup for the latest commit.
   return repo.loadAs("commit", "HEAD", function (err, head) {
@@ -1048,10 +1047,27 @@ function getRoot(repo, callback) {
         });
       }
       if (!head) return callback(null, current, {});
-      walkCommitTree(repo, head.tree, function (err, commitTree) {
-        if (err) return callback(err);
-        return callback(null, current, commitTree);
-      });
+      return callback(null, current);
     });
   });
 }
+
+// Tiny helper to make menu generation code cleaner
+function addSection(items, group) {
+  if (!group.length) return;
+  if (items.length) items.push({sep: true});
+  items.push.apply(items, group);
+  group.length = 0;
+}
+
+function nodeMenu(node) {
+  var items = [];
+  if (node.isDirty()) {
+    items.push({icon: "asterisk", label: "Stage All Changes", action: "stageChanges"});
+  }
+  if (node.isStaged()) {
+    items.push({icon: "plus-squared", label: "Commit Staged Changes", action: "createCommit"});
+  }
+  return items;
+}
+
