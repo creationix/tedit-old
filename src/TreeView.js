@@ -489,6 +489,7 @@ function TreeView(editor, git) {
 
   Tree.prototype.createFile = function () {
     var name = prompt("Enter name for new file");
+    var self = this;
     if (!name) return;
     this.childFromEntry({
       mode: 0100644,
@@ -496,12 +497,13 @@ function TreeView(editor, git) {
       hash: undefined
     }, function (err, child) {
       if (err) throw err;
-      this.addChild(child);
+      self.addChild(child);
     });
   };
 
   Tree.prototype.createFolder = function () {
     var name = prompt("Enter name for new folder");
+    var self = this;
     if (!name) return;
     this.childFromEntry({
       mode: 040000,
@@ -509,12 +511,13 @@ function TreeView(editor, git) {
       hash: undefined
     }, function (err, child) {
       if (err) throw err;
-      this.addChild(child);
+      self.addChild(child);
     });
   };
 
   Tree.prototype.createSymLink = function () {
     var name = prompt("Enter name for the new symlink");
+    var self = this;
     if (!name) return;
 
     this.childFromEntry({
@@ -523,7 +526,7 @@ function TreeView(editor, git) {
       hash: undefined
     }, function (err, child) {
       if (err) throw err;
-      this.addChild(child);
+      self.addChild(child);
     });
   };
 
