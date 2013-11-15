@@ -1,6 +1,8 @@
 var domBuilder = require('dombuilder');
 var getMime = require('./mime.js');
 var githubConfig = require('./github-config.js');
+var XHR = require('js-github/src/xhr.js');
+var githubRepo = require('js-github');
 
 module.exports = TreeView;
 
@@ -33,6 +35,7 @@ function TreeView(editor, git) {
   var selected, commitTrees = {};
   var username = prefs.get("name"), email = prefs.get("email");
   var accessToken = prefs.get("accessToken");
+  var request = accessToken ? XHR("", accessToken) : null;
 
   // List of local repos.  key is name
   //   url -  value is remote url (may be null)
@@ -172,6 +175,7 @@ function TreeView(editor, git) {
     classes.length = 0;
     if (!this.parent) {
       var url = this.repo.remote && this.repo.remote.href;
+      if (this.repo.github) url = "https://github.com/" + this.repo.github + ".git";
       title = url + title;
       if (/\bgithub\b/.test(url)) classes.push("icon-github");
       else if (/\bbitbucket\b/.test(url)) classes.push("icon-bitbucket");
@@ -233,8 +237,10 @@ function TreeView(editor, git) {
     var root = this;
     while (root.parent) root = root.parent;
     root.save(function () {
-      root.repo.createRef("refs/tags/current", root.hash, function (err) {
+      if (root.hash === root.current) return;
+      root.repo.updateRef("refs/tags/current", root.hash, function (err) {
         if (err) return root.onError(err);
+        root.current = root.hash;
       });
     });
   };
@@ -244,29 +250,31 @@ function TreeView(editor, git) {
     // Get information from the user.
     var message = prompt("Enter commit message");
     if (!message) return;
-    if (!username) {
-      username = username || prompt("Enter your name");
-      if (!username) return;
-      prefs.set("name", username);
-    }
-    if (!email) {
-      email = email || prompt("Enter your email");
-      if (!email) return;
-      prefs.set("email", email);
+    var repo = this.repo;
+
+    if (!repo.github) {
+      if (!username) {
+        username = username || prompt("Enter your name");
+        if (!username) return;
+        prefs.set("name", username);
+      }
+      if (!email) {
+        email = email || prompt("Enter your email");
+        if (!email) return;
+        prefs.set("email", email);
+      }
     }
 
     // Find the root tree
     var root = this;
     while (root.parent) root = root.parent;
-    var repo = this.repo;
-
 
     repo.loadAs("commit", "HEAD", function (err, head, hash) {
       if (err) throw err;
       repo.saveAs("commit", {
         tree: root.hash,
         parent: hash,
-        author: { name: username, email: email },
+        author: repo.github ? undefined : { name: username, email: email },
         message: message
       }, function (err, hash) {
         if (err) throw err;
@@ -517,18 +525,20 @@ function TreeView(editor, git) {
       }
     }
     else {
-      items.push({sep:true});
-      if (this.repo.remote) {
-        if (this.hash === commitTree[this.path]) {
-          items.push({icon: "upload-cloud", label: "Push Changes to Remote", action: "push"});
-          items.push({icon: "download-cloud", label: "Pull Changes from Remote", action: "pull"});
+      if (!this.repo.github) {
+        items.push({sep:true});
+        if (this.repo.remote) {
+          if (this.hash === commitTree[this.path]) {
+            items.push({icon: "upload-cloud", label: "Push Changes to Remote", action: "push"});
+            items.push({icon: "download-cloud", label: "Pull Changes from Remote", action: "pull"});
+          }
         }
+        else {
+          items.push({icon: "upload-cloud", label: "Set remote url", action: "setRemote"});
+        }
+        items.push({icon: "th-list", label: "View Commit History"});
+        items.push({icon: "tags", label: "View Tags and Branches"});
       }
-      else {
-        items.push({icon: "upload-cloud", label: "Set remote url", action: "setRemote"});
-      }
-      items.push({icon: "th-list", label: "View Commit History"});
-      items.push({icon: "tags", label: "View Tags and Branches"});
       items.push({sep:true});
       items.push({icon: "trash", label: "Remove Repository", action: "removeRepo"});
     }
@@ -556,8 +566,9 @@ function TreeView(editor, git) {
       if (err) return tree.onError(err);
       tree.repo.loadAs("commit", refs.HEAD, function (err, head) {
         if (err) return tree.onError(err);
-        tree.repo.createRef("refs/tags/current", head.tree, function (err) {
+        tree.repo.updateRef("refs/tags/current", head.tree, function (err) {
           if (err) return tree.onError(err);
+          tree.current = head.tree;
           getRoot(tree.repo, function (err, hash, hashes) {
             if (err) throw err;
             commitTrees[tree.repo.name] = hashes;
@@ -712,12 +723,16 @@ function TreeView(editor, git) {
     var items = [];
     items.push({icon: "box", label: "Create new local repository", action: createRepo});
     items.push({icon: "box", label: "Clone from remote Repository", action: cloneRepo});
-    items.push({icon: "github", label: "Mount public github repository", action: mountRepo});
+    if (accessToken) {
+      items.push({icon: "github", label: "Mount public github repository", action: mountRepo});
+    }
     new ContextMenu(null, evt, items);
   };
 
-  domBuilder([".tree$el",
-    ["ul$ul"],
+  domBuilder(["$el",
+    [".tree",
+      ["ul$ul"],
+    ],
     ["$authButtons", { css: {
       position: "absolute",
       bottom: 0,
@@ -741,12 +756,13 @@ function TreeView(editor, git) {
   function renderLogout() {
     return ["button", {
       onclick: clearToken,
-      title: "Forget the saves github access token"
+      title: "Forget the saved github access token"
     }, "Forget Auth"];
   }
 
-  function cleanAuth() {
+  function loginAuth() {
     prefs.set("accessToken", accessToken);
+    request = XHR("", accessToken);
     console.log("Stored Access Token");
     self.authButtons.textContent = "";
     self.authButtons.appendChild(domBuilder(renderLogout()));
@@ -754,6 +770,8 @@ function TreeView(editor, git) {
 
   function clearToken() {
     accessToken = null;
+    request = null;
+    githubLogin = null;
     prefs.set("accessToken", accessToken);
     console.log("Forgot Access Token");
     self.authButtons.textContent = "";
@@ -771,7 +789,7 @@ function TreeView(editor, git) {
       tmp.href = evt.origin;
       if (tmp.hostname !== window.location.hostname) return;
       accessToken = evt.data.access_token;
-      if (accessToken) cleanAuth();
+      if (accessToken) loginAuth();
       else throw new Error("Problem getting oauth: " + JSON.stringify(evt.data));
     }
     window.open("https://github.com/login/oauth/authorize" +
@@ -786,7 +804,7 @@ function TreeView(editor, git) {
     evt.stopPropagation();
     accessToken = prompt("Enter access token from https://github.com/settings/applications");
     if (!accessToken) return;
-    cleanAuth();
+    loginAuth();
   }
 
   this.el.js = this;
@@ -814,6 +832,14 @@ function TreeView(editor, git) {
     if (Array.isArray(meta) || typeof meta !== "object") meta = repos[name] = {};
     if (!meta.url || typeof meta.url !== "string") meta.url = null;
     if (!meta.opened || Array.isArray(meta.opened) || typeof meta.opened !== "object") meta.opened = {"":true};
+
+    if (meta.github) {
+      if (!accessToken) return;
+      var repo = githubRepo(meta.github, accessToken);
+      repo.github = meta.github;
+      repo.name = name;
+      return addRepo(repo);
+    }
 
     var db = git.db(name);
     db.init(function (err) {
@@ -879,13 +905,34 @@ function TreeView(editor, git) {
     });
   }
 
+  var githubLogin = null;
   function mountRepo() {
-    var root = prompt("Enter username/project");
+    if (!githubLogin) return request("GET", "/user", onUser);
+    function onUser(err, result) {
+      if (err) throw err;
+      githubLogin = result.login;
+      return mountRepo();
+    }
+    var root = prompt("Enter username/project", githubLogin + "/");
+    if (!root) return;
+    return request("GET", "/repos/" + root, onRepo);
+    function onRepo(err, result) {
+      if (err) throw err;
+      var repo = githubRepo(root, accessToken);
+      repo.name = result.name;
+      repo.description = result.description;
+      repos[repo.name] = {
+        github: root,
+        opened: { "": true }
+      };
+      prefs.set("repos", repos);
+      addRepo(repo);
+    }
   }
 
   function removeRepo(tree) {
     if (!confirm("Are you sure you want to remove '" + tree.repo.name + "'?")) return;
-    tree.repo.db.clear(function (err) {
+    tree.repo.db && tree.repo.db.clear(function (err) {
       if (err) throw err;
     });
     tree.clearChildren();
@@ -899,6 +946,7 @@ function TreeView(editor, git) {
       if (err) throw err;
       commitTrees[repo.name] = hashes;
       var root = new Tree(repo, 040000, repo.name, hash, null);
+      root.current = hash;
       self.ul.appendChild(root.el);
     });
   }
@@ -942,6 +990,7 @@ function onClick(node) {
 
 function walkCommitTree(repo, root, callback) {
   var commitTree = {};
+  return callback(null, commitTree);
   return walk("", root, function (err) {
     if (err) return callback(err);
     return callback(null, commitTree);
@@ -950,6 +999,7 @@ function walkCommitTree(repo, root, callback) {
   function walk(path, hash, callback) {
     var done = false, left = 1;
     commitTree[path] = hash;
+    console.log("WALK", path);
     repo.loadAs("tree", hash, function (err, tree) {
       if (err) return callback(err);
       tree.forEach(function (entry) {
@@ -982,10 +1032,16 @@ function getRoot(repo, callback) {
     if (err) return callback(err);
     return repo.readRef("refs/tags/current", function (err, current) {
       if (err) return callback(err);
-      current = current || head && head.tree;
+      if (!current && head) {
+        current = head.tree;
+        repo.createRef("refs/tags/current", current, function (err) {
+          if (err) throw err;
+        });
+      }
+
       if (!current) {
         return repo.saveAs("tree", [], function (err, current) {
-          repo.createRef("refs/tags/current", current, function (err) {
+          repo.updateRef("refs/tags/current", current, function (err) {
             if (err) return callback(err);
             return callback(null, current, {});
           });

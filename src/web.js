@@ -14,7 +14,7 @@ window.addEventListener('load', function(e) {
 
 var platform = {
   sha1: require('git-sha1'),
-  bops: require('bops-browser'),
+  bops: require('bops'),
   tcp: require('websocket-tcp-client').tcp,
   tls: require('websocket-tcp-client').tls,
   trace: function (name, stream, message) {
@@ -25,7 +25,7 @@ var platform = {
 platform.http = require('git-http')(platform);
 
 require('./app.js')({
-  repo: require('js-git')(platform),
+  repo: require('js-git'),
   remote: require('git-net')(platform),
   db: require('git-indexeddb')(platform),
   prefs: require('./prefs.js'),
