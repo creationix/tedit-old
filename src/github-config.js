@@ -13,5 +13,5 @@ else if (hostname === "tedit.creationix.com") {
 }
 else {
   module.exports = {};
-  console.warn("Missing config for hostname: " + hostname);
+  console.warn("Missing github oauth config for hostname: " + hostname);
 }
