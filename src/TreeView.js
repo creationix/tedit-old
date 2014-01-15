@@ -1,7 +1,7 @@
 var domBuilder = require('dombuilder');
 var getMime = require('./mime.js');
 var githubConfig = require('./github-config.js');
-var XHR = require('js-github/src/xhr.js');
+var XHR = require('js-github/xhr.js');
 var githubRepo = require('js-github');
 var progressParser = require('./progress-parser.js');
 
