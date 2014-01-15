@@ -1,7 +1,7 @@
 /*global URL*/
 var CodeMirror = require('./codemirror.js');
 var domBuilder = require('dombuilder');
-var bops = require('bops-browser');
+var bops = require('bops');
 var getMime = require('./mime.js');
 window.CodeMirror = CodeMirror;
 
