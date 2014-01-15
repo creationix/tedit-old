@@ -11,12 +11,7 @@ else if (hostname === "tedit.creationix.com") {
     redirectUri: "https://tedit.creationix.com/github-callback"
   };
 }
-else if (hostname === "current.tedit.localhost") {
-  module.exports = {
-    clientId: "700f0fceacdc16c17cf9",
-    redirectUri: "http://current.tedit.localhost:8000/github-callback"
-  };
-}
 else {
-  throw new Error("Missing config for hostname: " + hostname);
+  module.exports = {};
+  console.warn("Missing config for hostname: " + hostname);
 }
