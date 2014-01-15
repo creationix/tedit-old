@@ -84,7 +84,7 @@ function cjs(req, callback) {
       return callback(new Error("Invalid path extension: " + path));
 
       function onJavaScript(err, js) {
-        if (err) return callback(err);
+        if (js === undefined) return callback(err);
         processJs(path, js, callback);
       }
 
@@ -130,7 +130,7 @@ function cjs(req, callback) {
     function loadPackage(base, name, callback) {
       var key = pathJoin(base, name);
       if (key in packagePaths) return callback(null, packagePaths[key]);
-      var metaPath = pathJoin(base, "node_modules", name, "package.json");
+      var metaPath = pathJoin(base, "modules", name, "package.json");
       loader(metaPath, false, function (err, json) {
         if (err) return callback(err);
         if (!json) {
